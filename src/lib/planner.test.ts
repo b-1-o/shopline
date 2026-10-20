@@ -76,7 +76,7 @@ describe("Shopline planning", () => {
     }])) as Record<string, StoreAssignment>;
     const stops = optimizeStoreStops(sampleLines, assignments);
     expect(stops).toHaveLength(2);
-    expect(stops.reduce((sum, stop) => sum + stop.itemCount, 0)).toBe(sampleLines.length);
+    expect(stops.reduce((sum, stop) => sum + stop.itemCount, 0)).toBe(sampleLines.reduce((sum, line) => sum + line.quantity, 0));
   });
 
 });
