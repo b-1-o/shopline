@@ -328,7 +328,7 @@ export default function App() {
               <div className="segmented duration-segmented" role="group" aria-label="Plan length">
                 {([3, 5, 7] as const).map((days) => (
                   <button type="button" key={days} onClick={() => setPreference("days", days)} className={preferences.days === days ? "selected" : ""}>
-                    <strong>{days}</strong><span>{days === 1 ? "day" : "days"}</span>
+                    <strong>{days}</strong><span>{"days"}</span>
                   </button>
                 ))}
               </div>
