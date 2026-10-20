@@ -317,7 +317,7 @@ export default function App() {
       return;
     }
     if (!liveConfigured) {
-      setLiveSearchComplete(true);
+      setLiveSearchComplete(false);
       setStoreLocations([]);
       setNotice("Kroger price lookup is not connected in this deployment. The list remains available with indicative estimates.");
       return;
@@ -519,8 +519,8 @@ export default function App() {
                     <div><span className="section-kicker">FROM LIST TO REAL LIFE</span><h3>Now, where should you shop?</h3><p>Explore stores or shopping options around ZIP {preferences.zip || "your area"}. The retailer confirms its own prices, stock and fees.</p></div>
                   </div>
                   <div className="store-link-row">
-                    <a className="store-link-card" href={mapsUrl} target="_blank" rel="noreferrer"><span className="store-link-icon"><Store size={17} /></span><span><strong>Nearby stores</strong><small>Map & locations</small></span><ArrowUpRight size={15} /></a>
-                    <a className="store-link-card" href={deliveryUrl} target="_blank" rel="noreferrer"><span className="store-link-icon delivery"><Truck size={17} /></span><span><strong>{preferences.mode === "pickup" ? "Pickup options" : "Delivery options"}</strong><small>Compare providers</small></span><ArrowUpRight size={15} /></a>
+                    <button type="button" className="store-link-card" onClick={openNearby}><span className="store-link-icon"><Store size={17} /></span><span><strong>Nearby stores</strong><small>Search and route in Shopline</small></span><ArrowRight size={15} /></button>
+                    <button type="button" className="store-link-card" onClick={openDeliveryOptions}><span className="store-link-icon delivery"><Truck size={17} /></span><span><strong>{preferences.mode === "pickup" ? "Pickup options" : "Delivery planning"}</strong><small>Manage shopping mode here</small></span><ArrowRight size={15} /></button>
                   </div>
                 </section>
               </>

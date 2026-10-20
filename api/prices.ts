@@ -91,9 +91,11 @@ export default async function handler(req: ApiRequest, res: ApiResponse): Promis
     res.status(400).json({ error: "Enter a valid 5-digit ZIP code." });
     return;
   }
+  const action = queryValue(req.query?.action);
+  const locationsOnly = action === "locations";
   const rawItems = queryValue(req.query?.items);
   const items = parseItems(rawItems || queryValue(req.query?.terms));
-  if (!items.length) {
+  if (!items.length && !locationsOnly) {
     res.status(400).json({ error: "Add at least one item to look up." });
     return;
   }
@@ -128,6 +130,19 @@ export default async function handler(req: ApiRequest, res: ApiResponse): Promis
     });
     if (!stores.length) {
       res.status(200).json({ configured: true, source: "Kroger", stores: [], assignments: [], unmatched: items.map((item) => item.id), retrievedAt: new Date().toISOString(), message: "No Kroger locations were found within 25 miles of this ZIP code." });
+      return;
+    }
+
+    if (locationsOnly) {
+      res.status(200).json({
+        configured: true,
+        source: "Kroger",
+        stores,
+        assignments: [],
+        unmatched: [],
+        retrievedAt: new Date().toISOString(),
+        message: "Nearby Kroger locations found. Add items to compare product prices."
+      });
       return;
     }
 

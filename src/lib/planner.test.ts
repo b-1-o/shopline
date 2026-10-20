@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { INGREDIENTS, RECIPES } from "../data";
-import { buildBasket, buildPlan, matchesDiet } from "./planner";
+import { HOUSEHOLD_ITEMS, INGREDIENTS, RECIPES } from "../data";
+import { buildBasket, buildHouseholdQuantities, buildPlan, matchesAllergies, matchesDiet, optimizeStoreStops } from "./planner";
+import { DEFAULT_QUIZ_ANSWERS } from "./storage";
+import type { QuizAnswers, StoreAssignment } from "../types";
 
 describe("Shopline planning", () => {
   it("filters recipes by a selected diet", () => {
@@ -28,4 +30,53 @@ describe("Shopline planning", () => {
     expect(plan).toHaveLength(4);
     expect(plan.every((id) => matchesDiet(RECIPES.find((recipe) => recipe.id === id)!, "vegan"))).toBe(true);
   });
+  it("adds selected household essentials while excluding items already owned", () => {
+    const answers: QuizAnswers = {
+      ...DEFAULT_QUIZ_ANSWERS,
+      zip: "90210",
+      budget: 350,
+      groups: ["food", "paper", "personal-care"],
+      alreadyHave: ["razors"],
+      hasKids: false,
+      hasPets: false
+    };
+    const extras = buildHouseholdQuantities(HOUSEHOLD_ITEMS, answers);
+    expect(extras["toilet-paper"]).toBeGreaterThan(0);
+    expect(extras["shampoo"]).toBeGreaterThan(0);
+    expect(extras["razors"]).toBeUndefined();
+    expect(extras["dish-soap"]).toBeUndefined();
+
+    const lines = buildBasket([], HOUSEHOLD_ITEMS, answers.servings, {}, {}, extras);
+    expect(lines.some((line) => line.ingredient.id === "toilet-paper")).toBe(true);
+    expect(lines.some((line) => line.ingredient.id === "razors")).toBe(false);
+  });
+
+  it("filters a recipe suggestion when a selected allergen is present", () => {
+    const peanutNoodles = RECIPES.find((recipe) => recipe.id === "peanut-noodles")!;
+    const blackBeanTacos = RECIPES.find((recipe) => recipe.id === "black-bean-tacos")!;
+    expect(matchesAllergies(peanutNoodles, ["peanuts"])).toBe(false);
+    expect(matchesAllergies(blackBeanTacos, ["peanuts"])).toBe(true);
+  });
+
+  it("groups product assignments into store stops", () => {
+    const sampleLines = buildBasket(
+      [RECIPES.find((recipe) => recipe.id === "black-bean-tacos")!],
+      INGREDIENTS,
+      2
+    ).slice(0, 2);
+    const storeA = { id: "store-a", name: "Kroger A", address: "1 Main St", latitude: 34.1, longitude: -118.2 };
+    const storeB = { id: "store-b", name: "Kroger B", address: "2 Main St", latitude: 34.2, longitude: -118.3 };
+    const assignments = Object.fromEntries(sampleLines.map((line, index) => [line.ingredient.id, {
+      ingredientId: line.ingredient.id,
+      query: line.ingredient.name,
+      name: line.ingredient.name,
+      price: line.ingredient.price,
+      source: "Kroger",
+      store: index === 0 ? storeA : storeB
+    }])) as Record<string, StoreAssignment>;
+    const stops = optimizeStoreStops(sampleLines, assignments);
+    expect(stops).toHaveLength(2);
+    expect(stops.reduce((sum, stop) => sum + stop.itemCount, 0)).toBe(sampleLines.length);
+  });
+
 });

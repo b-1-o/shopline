@@ -176,7 +176,7 @@ export function optimizeStoreStops(
         longitude: remaining.reduce((sum, stop) => sum + (stop.longitude || 0), 0) / remaining.length
       };
   const ordered: StoreStop[] = [];
-  let current = firstPoint;
+  let current: { latitude?: number; longitude?: number } = firstPoint;
   while (remaining.length) {
     let closestIndex = 0;
     let closestDistance = Number.POSITIVE_INFINITY;
