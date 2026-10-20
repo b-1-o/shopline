@@ -789,21 +789,38 @@ function CartRow({
   line,
   onToggle,
   onQuantity,
-  detailed = false
+  detailed = false,
+  assignment,
+  liveChecked = false
 }: {
   line: CartLine;
   onToggle: () => void;
   onQuantity: (delta: number) => void;
   detailed?: boolean;
+  assignment?: StoreAssignment;
+  liveChecked?: boolean;
 }) {
+  const liveUnitPrice = assignment ? (assignment.promoPrice && assignment.promoPrice > 0 ? assignment.promoPrice : assignment.price) : line.ingredient.price;
+  const rowCost = line.quantity * liveUnitPrice;
   return (
     <div className={"cart-row" + (line.checked ? " checked" : "") + (detailed ? " detailed-row" : "")}>
       <button className="cart-check" type="button" aria-label={(line.checked ? "Uncheck " : "Check ") + line.ingredient.name} onClick={onToggle}>
         {line.checked && <Check size={13} />}
       </button>
-      <div className="cart-row-copy"><strong>{line.ingredient.name}</strong><span>{line.ingredient.packageLabel}{detailed ? " · needs " + quantityText(line.amountNeeded, line.amountUnit) : ""}</span></div>
+      <div className="cart-row-copy">
+        <strong>{line.ingredient.name}</strong>
+        <span>{line.ingredient.packageLabel}{detailed ? " · needs " + quantityText(line.amountNeeded, line.amountUnit) : ""}</span>
+        <span className={"cart-store-label" + (assignment ? " matched" : liveChecked ? " unmatched" : "")}>
+          {assignment
+            ? <><Store size={11}/><span>{assignment.store.name}{assignment.size ? " · " + assignment.size : ""}</span></>
+            : liveChecked
+              ? <><Info size={11}/><span>No nearby match · estimate</span></>
+              : <><MapPin size={11}/><span>Store pending price check</span></>}
+        </span>
+      </div>
       <div className="cart-row-end">
-        <strong className="cart-row-price">{formatCurrency(line.cost)}</strong>
+        <strong className="cart-row-price">{formatCurrency(rowCost)}</strong>
+        {assignment?.promoPrice && assignment.promoPrice > 0 && <span className="cart-promo-note">promo</span>}
         <div className="qty-stepper">
           <button type="button" aria-label={"Remove one " + line.ingredient.name} onClick={() => onQuantity(-1)} disabled={line.quantity <= 0}><Minus size={12} /></button>
           <span>{line.quantity}</span>
@@ -826,16 +843,40 @@ function OffersPanel({ offers, location, checkedAt }: { offers: LiveOffer[]; loc
   );
 }
 
-function ShoppingDestinations({ mode, zip, mapsUrl, deliveryUrl, shoppingUrl }: { mode: ShoppingMode; zip: string; mapsUrl: string; deliveryUrl: string; shoppingUrl: string }) {
+function ShoppingDestinations({
+  mode,
+  zip,
+  onNearby,
+  onDelivery,
+  onCompare
+}: {
+  mode: ShoppingMode;
+  zip: string;
+  onNearby: () => void;
+  onDelivery: () => void;
+  onCompare: () => void;
+}) {
   return (
     <section className="destinations-section">
       <div className="section-kicker">TAKE THE NEXT STEP <span className="kicker-line" /></div>
       <h2>From plan to pantry.</h2>
-      <p className="section-description">Use your list to compare options. Retailers confirm final prices, stock and service fees.</p>
+      <p className="section-description">Find stores, compare product matches and organize stops here — without losing your list in another tab.</p>
       <div className="destination-grid">
-        <a href={mapsUrl} target="_blank" rel="noreferrer" className="destination-card"><span className="destination-icon green"><MapPinned size={19} /></span><span><strong>Shop nearby</strong><small>Grocery stores near {zip}</small></span><ArrowUpRight size={16} /></a>
-        <a href={deliveryUrl} target="_blank" rel="noreferrer" className="destination-card"><span className="destination-icon orange"><Truck size={19} /></span><span><strong>{mode === "pickup" ? "Find pickup" : "Order online"}</strong><small>Explore services by ZIP</small></span><ArrowUpRight size={16} /></a>
-        <a href={shoppingUrl} target="_blank" rel="noreferrer" className="destination-card"><span className="destination-icon lavender"><Search size={19} /></span><span><strong>Compare products</strong><small>Open shopping search</small></span><ArrowUpRight size={16} /></a>
+        <button type="button" onClick={onNearby} className="destination-card">
+          <span className="destination-icon green"><MapPinned size={19} /></span>
+          <span><strong>Shop nearby</strong><small>{zip ? "Stores near " + zip : "Add a ZIP or share location"}</small></span>
+          <ArrowRight size={16} />
+        </button>
+        <button type="button" onClick={onDelivery} className="destination-card">
+          <span className="destination-icon orange">{mode === "pickup" ? <MapPinned size={19}/> : <Truck size={19}/>}</span>
+          <span><strong>{mode === "pickup" ? "Plan a pickup" : mode === "delivery" ? "Delivery planning" : "Pickup & delivery"}</strong><small>Choose a shopping mode</small></span>
+          <ArrowRight size={16} />
+        </button>
+        <button type="button" onClick={onCompare} className="destination-card">
+          <span className="destination-icon lavender"><Search size={19} /></span>
+          <span><strong>Compare products</strong><small>Match items to nearby stores</small></span>
+          <ArrowRight size={16} />
+        </button>
       </div>
     </section>
   );
