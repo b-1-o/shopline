@@ -1,6 +1,6 @@
 export type Diet = "all" | "vegetarian" | "vegan" | "dairy-free" | "high-protein";
 export type ShoppingMode = "store" | "pickup" | "delivery";
-export type ViewName = "planner" | "recipes" | "list";
+export type ViewName = "planner" | "recipes" | "list" | "shops";
 
 export interface Ingredient {
   id: string;
