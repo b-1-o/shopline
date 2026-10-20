@@ -1,18 +1,20 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
 import type { CSSProperties } from "react";
 import {
   ArrowDownToLine, ArrowLeft, ArrowRight, ArrowUpRight, BadgeCheck, Check,
-  CheckCircle2, ChefHat, ChevronDown, Clock3, CookingPot, ExternalLink,
-  Heart, Info, Leaf, ListChecks, MapPin, MapPinned, Minus, Plus, Search,
+  CheckCircle2, ChefHat, Clock3, CookingPot, Heart, Info, Leaf, ListChecks, MapPin, MapPinned, Minus, Plus, Search,
   ShoppingBag, ShoppingBasket, ShoppingCart, SlidersHorizontal, Sparkles,
-  Sprout, Store, Truck, Users, Wallet, X, Moon, Sun, MapPinCheck
+  Sprout, Store, Truck, Users, Wallet, X, Moon, Sun, MapPinCheck, Trash2, RefreshCw, ShieldCheck
 } from "lucide-react";
-import { INGREDIENTS, RECIPES } from "./data";
-import { buildBasket, buildPlan, buildShoppingText, estimateRecipeCost, formatCurrency, matchesDiet } from "./lib/planner";
-import { DEFAULT_PREFERENCES, getAnonymousSessionId, readStored, writeStored } from "./lib/storage";
-import type { CartLine, Diet, LiveOffer, Preferences, Recipe, ShoppingMode, ViewName } from "./types";
+import { HOUSEHOLD_ITEMS, INGREDIENTS, RECIPES } from "./data";
+import { buildBasket, buildHouseholdQuantities, buildPlan, buildShoppingText, estimateRecipeCost, formatCurrency, matchesAllergies, matchesDiet, optimizeStoreStops } from "./lib/planner";
+import { DEFAULT_PREFERENCES, DEFAULT_QUIZ_ANSWERS, getAnonymousSessionId, readStored, writeStored } from "./lib/storage";
+import type { CartLine, Diet, LiveOffer, Preferences, QuizAnswers, Recipe, ShoppingMode, StoreAssignment, StorePoint, StoreStop, ViewName } from "./types";
+import ShoppingQuiz from "./components/ShoppingQuiz";
 
-const STARTER_PLAN = ["chickpea-bowls", "black-bean-tacos", "lemon-chicken", "peanut-noodles", "tomato-pasta"];
+const RouteMap = lazy(() => import("./components/RouteMap"));
+const ALL_INGREDIENTS = [...INGREDIENTS, ...HOUSEHOLD_ITEMS];
+
 const DIET_OPTIONS: Array<{ value: Diet; label: string; icon: string }> = [
   { value: "all", label: "Everything", icon: "✳" },
   { value: "vegetarian", label: "Vegetarian", icon: "◌" },
@@ -27,8 +29,33 @@ const MODE_OPTIONS: Array<{ value: ShoppingMode; label: string; sub: string }> =
 ];
 
 function readInitialPlan(): string[] {
-  const saved = readStored<string[]>("meal-plan", STARTER_PLAN);
+  const saved = readStored<string[]>("meal-plan", []);
   return saved.filter((id) => RECIPES.some((recipe) => recipe.id === id));
+}
+
+function readInitialPreferences(): Preferences {
+  const saved = readStored<Preferences>("preferences", DEFAULT_PREFERENCES);
+  return {
+    ...DEFAULT_PREFERENCES,
+    ...saved,
+    // 91605 was the old demo ZIP default, not a user-entered location.
+    zip: saved.zip === "91605" ? "" : (saved.zip || ""),
+    budget: Math.max(25, Math.min(2000, Number(saved.budget) || DEFAULT_PREFERENCES.budget))
+  };
+}
+
+function readInitialQuiz(): QuizAnswers {
+  const savedProfile = readStored<QuizAnswers | null>("household-profile", null);
+  const saved = savedProfile || readStored<QuizAnswers>("last-quiz", DEFAULT_QUIZ_ANSWERS);
+  return {
+    ...DEFAULT_QUIZ_ANSWERS,
+    ...saved,
+    zip: saved.zip === "91605" ? "" : (saved.zip || ""),
+    budget: Math.max(25, Math.min(2000, Number(saved.budget) || DEFAULT_QUIZ_ANSWERS.budget)),
+    groups: saved.groups?.length ? saved.groups : ["food", "paper", "cleaning", "personal-care"],
+    allergies: saved.allergies || [],
+    alreadyHave: saved.alreadyHave || []
+  };
 }
 
 function RecipeCard({
@@ -78,10 +105,15 @@ function quantityText(amount: number, unit: string): string {
 }
 
 export default function App() {
-  const [preferences, setPreferences] = useState<Preferences>(() => readStored("preferences", DEFAULT_PREFERENCES));
+  const [preferences, setPreferences] = useState<Preferences>(readInitialPreferences);
   const [selectedIds, setSelectedIds] = useState<string[]>(readInitialPlan);
   const [quantityOverrides, setQuantityOverrides] = useState<Record<string, number>>(() => readStored("quantities", {}));
   const [checkedItems, setCheckedItems] = useState<Record<string, boolean>>(() => readStored("checked", {}));
+  const [extraQuantities, setExtraQuantities] = useState<Record<string, number>>(() => readStored("extra-quantities", {}));
+  const [householdProfile, setHouseholdProfile] = useState<QuizAnswers | null>(() => readStored<QuizAnswers | null>("household-profile", null));
+  const [quizAnswers, setQuizAnswers] = useState<QuizAnswers>(readInitialQuiz);
+  const [quizOpen, setQuizOpen] = useState(() => readStored<QuizAnswers | null>("household-profile", null) === null);
+  const [sharedLocation, setSharedLocation] = useState<{ latitude: number; longitude: number } | null>(null);
   const [activeView, setActiveView] = useState<ViewName>("planner");
   const [theme, setTheme] = useState<"dark" | "light">(() => readStored<"dark" | "light">("theme", "dark"));
   const [viewLeaving, setViewLeaving] = useState(false);
@@ -90,10 +122,12 @@ export default function App() {
   const [notice, setNotice] = useState("");
   const [liveConfigured, setLiveConfigured] = useState(false);
   const [checkingOffers, setCheckingOffers] = useState(false);
-  const [offers, setOffers] = useState<LiveOffer[]>([]);
-  const [offerLocation, setOfferLocation] = useState("");
+  const [liveAssignments, setLiveAssignments] = useState<Record<string, StoreAssignment>>({});
+  const [liveSearchComplete, setLiveSearchComplete] = useState(false);
+  const [storeLocations, setStoreLocations] = useState<StorePoint[]>([]);
   const [offerCheckedAt, setOfferCheckedAt] = useState("");
   const [mobileCartOpen, setMobileCartOpen] = useState(false);
+  const [clearConfirmOpen, setClearConfirmOpen] = useState(false);
   const anonymousSessionId = useMemo(() => getAnonymousSessionId(), []);
 
   const selectedRecipes = useMemo(
@@ -101,24 +135,34 @@ export default function App() {
     [selectedIds]
   );
   const basketItems = useMemo(
-    () => buildBasket(selectedRecipes, INGREDIENTS, preferences.servings, quantityOverrides, checkedItems),
-    [selectedIds, preferences.servings, quantityOverrides, checkedItems]
+    () => buildBasket(selectedRecipes, ALL_INGREDIENTS, preferences.servings, quantityOverrides, checkedItems, extraQuantities),
+    [selectedIds, preferences.servings, quantityOverrides, checkedItems, extraQuantities]
   );
-  const basketTotal = basketItems.reduce((sum, item) => sum + item.cost, 0);
   const activeItems = basketItems.filter((item) => item.quantity > 0);
+  const basketTotal = basketItems.reduce((sum, item) => {
+    const assignment = liveAssignments[item.ingredient.id];
+    const unitPrice = assignment ? (assignment.promoPrice && assignment.promoPrice > 0 ? assignment.promoPrice : assignment.price) : item.ingredient.price;
+    return sum + item.quantity * unitPrice;
+  }, 0);
   const checkedCount = basketItems.filter((item) => item.checked).length;
   const remainingBudget = preferences.budget - basketTotal;
   const progress = Math.min(100, (basketTotal / Math.max(1, preferences.budget)) * 100);
-  const eligibleRecipes = RECIPES.filter((recipe) => matchesDiet(recipe, preferences.diet));
+  const eligibleRecipes = RECIPES.filter((recipe) => matchesDiet(recipe, preferences.diet) && matchesAllergies(recipe, quizAnswers.allergies));
   const visibleRecipes = activeView === "recipes" ? eligibleRecipes : selectedRecipes;
   const currencyPerMeal = selectedRecipes.length ? basketTotal / selectedRecipes.length : 0;
+  const routeStops = useMemo(
+    () => optimizeStoreStops(basketItems, liveAssignments, sharedLocation),
+    [basketItems, liveAssignments, sharedLocation]
+  );
+  const unmatchedItems = activeItems.filter((line) => !liveAssignments[line.ingredient.id]);
 
   useEffect(() => {
     writeStored("preferences", preferences);
     writeStored("meal-plan", selectedIds);
     writeStored("quantities", quantityOverrides);
     writeStored("checked", checkedItems);
-  }, [preferences, selectedIds, quantityOverrides, checkedItems]);
+    writeStored("extra-quantities", extraQuantities);
+  }, [preferences, selectedIds, quantityOverrides, checkedItems, extraQuantities]);
 
   useEffect(() => {
     writeStored("theme", theme);
@@ -156,29 +200,69 @@ export default function App() {
 
   const setPreference = <K extends keyof Preferences>(key: K, value: Preferences[K]) => {
     setPreferences((current) => ({ ...current, [key]: value }));
+    setQuizAnswers((current) => ({ ...current, [key]: value }));
     if (key === "zip") {
-      setOffers([]);
+      setLiveAssignments({});
+      setLiveSearchComplete(false);
+      setStoreLocations([]);
     }
   };
 
-  const generatePlan = () => {
-    if (!/^\d{5}$/.test(preferences.zip.trim())) {
-      setNotice("Enter a 5-digit ZIP code to tailor shopping options.");
-      return;
-    }
-    const ids = buildPlan(RECIPES, INGREDIENTS, preferences.days, preferences.servings, preferences.diet, preferences.budget);
+  const applyQuizAnswers = (answers: QuizAnswers, coordinates: { latitude: number; longitude: number } | null) => {
+    const extras = buildHouseholdQuantities(HOUSEHOLD_ITEMS, answers);
+    const essentialsEstimate = Object.entries(extras).reduce((sum, [id, quantity]) => {
+      const item = HOUSEHOLD_ITEMS.find((candidate) => candidate.id === id);
+      return sum + (item?.price || 0) * quantity;
+    }, 0);
+    const foodBudget = Math.max(25, answers.budget - essentialsEstimate);
+    const ids = buildPlan(RECIPES, INGREDIENTS, answers.days, answers.servings, answers.diet, foodBudget, answers.allergies);
+
+    setPreferences({ zip: answers.zip, budget: answers.budget, days: answers.days, servings: answers.servings, diet: answers.diet, mode: answers.mode });
+    setQuizAnswers(answers);
     setSelectedIds(ids);
+    setExtraQuantities(extras);
     setQuantityOverrides({});
     setCheckedItems({});
-    setOffers([]);
-    navigateTo("planner");
-    setNotice("Your plan is refreshed around your preferences.");
+    setLiveAssignments({});
+    setLiveSearchComplete(false);
+    setStoreLocations([]);
+    setOfferCheckedAt("");
+    setSharedLocation(coordinates);
+    setHouseholdProfile(answers.profileMode === "remember" ? answers : null);
+    writeStored("household-profile", answers.profileMode === "remember" ? answers : null);
+    writeStored("last-quiz", answers);
+    setQuizOpen(false);
+    setMobileCartOpen(false);
+    navigateTo("list");
+    setNotice(answers.profileMode === "remember" ? "Household profile saved on this device. Your list is ready." : "Your one-time shopping brief is ready.");
+  };
+
+  const startPlan = () => {
+    if (householdProfile?.profileMode === "remember") {
+      applyQuizAnswers(householdProfile, sharedLocation);
+      return;
+    }
+    setQuizAnswers((current) => ({ ...current, profileMode: "ask" }));
+    setQuizOpen(true);
+  };
+
+  const openQuiz = () => {
+    setQuizAnswers(householdProfile || quizAnswers);
+    setQuizOpen(true);
+  };
+
+  const clearLiveMatches = () => {
+    setLiveAssignments({});
+    setLiveSearchComplete(false);
+    setStoreLocations([]);
+    setOfferCheckedAt("");
   };
 
   const toggleRecipe = (recipe: Recipe) => {
     const existingIndex = selectedIds.indexOf(recipe.id);
     if (existingIndex >= 0) {
       setSelectedIds((current) => current.filter((id, index) => !(id === recipe.id && index === existingIndex)));
+      clearLiveMatches();
       setNotice("Meal removed. Your grocery list is updated.");
       return;
     }
@@ -187,6 +271,7 @@ export default function App() {
       return;
     }
     setSelectedIds((current) => [...current, recipe.id]);
+    clearLiveMatches();
     setNotice("Meal added. Your grocery list is updated.");
   };
 
@@ -202,7 +287,7 @@ export default function App() {
   };
 
   const downloadList = () => {
-    const text = buildShoppingText(basketItems, preferences.zip, preferences.budget);
+    const text = buildShoppingText(basketItems, preferences.zip, preferences.budget, liveAssignments);
     const blob = new Blob([text], { type: "text/plain;charset=utf-8" });
     const url = URL.createObjectURL(blob);
     const anchor = document.createElement("a");
@@ -216,7 +301,7 @@ export default function App() {
   };
 
   const copyList = async () => {
-    const text = buildShoppingText(basketItems, preferences.zip, preferences.budget);
+    const text = buildShoppingText(basketItems, preferences.zip, preferences.budget, liveAssignments);
     try {
       await navigator.clipboard.writeText(text);
       setNotice("Shopping list copied to your clipboard.");
@@ -226,45 +311,81 @@ export default function App() {
   };
 
   const checkLiveOffers = async () => {
-    if (!liveConfigured) {
-      setNotice("Live prices are not connected yet. See the setup notes in the repository README.");
-      return;
-    }
     if (!/^\d{5}$/.test(preferences.zip.trim())) {
-      setNotice("Enter a valid 5-digit ZIP code first.");
+      setQuizOpen(true);
+      setNotice("Add a ZIP code or choose your location before searching nearby stores.");
       return;
     }
-    const terms = activeItems.slice(0, 10).map((line) => line.ingredient.name);
-    if (!terms.length) {
-      setNotice("Add at least one meal before checking offers.");
+    if (!liveConfigured) {
+      setLiveSearchComplete(true);
+      setStoreLocations([]);
+      setNotice("Kroger price lookup is not connected in this deployment. The list remains available with indicative estimates.");
       return;
     }
+
+    const requestedItems = activeItems.map((line) => ({ id: line.ingredient.id, term: line.ingredient.searchTerm || line.ingredient.name }));
     setCheckingOffers(true);
-    setOffers([]);
+    setLiveSearchComplete(false);
+    setLiveAssignments({});
     try {
-      const response = await fetch("/api/prices?zip=" + encodeURIComponent(preferences.zip.trim()) + "&terms=" + encodeURIComponent(terms.join(",")));
+      const action = requestedItems.length ? "shop" : "locations";
+      const query = new URLSearchParams({ action, zip: preferences.zip.trim() });
+      if (requestedItems.length) query.set("items", JSON.stringify(requestedItems));
+      const response = await fetch("/api/prices?" + query.toString());
       const data = await response.json() as {
         error?: string;
         message?: string;
-        location?: { name?: string; address?: string } | null;
         retrievedAt?: string;
-        items?: LiveOffer[];
+        assignments?: StoreAssignment[];
+        stores?: StorePoint[];
       };
       if (!response.ok) throw new Error(data.error || "Live price check failed.");
-      setOffers(data.items || []);
-      setOfferLocation(data.location?.name || "");
+      const nextAssignments = Object.fromEntries((data.assignments || []).map((item) => [item.ingredientId, item]));
+      setLiveAssignments(nextAssignments);
+      setStoreLocations(data.stores || []);
       setOfferCheckedAt(data.retrievedAt || new Date().toISOString());
-      setNotice(data.items?.length ? "Live Kroger product prices were retrieved." : (data.message || "No matching priced products were found."));
+      setLiveSearchComplete(true);
+      if (requestedItems.length) {
+        const matched = Object.keys(nextAssignments).length;
+        setNotice(matched
+          ? (data.message || ("Matched " + matched + " of " + requestedItems.length + " items with current Kroger offers."))
+          : (data.message || "No priced matches found; the list still uses planning estimates."));
+      } else {
+        setNotice((data.stores?.length || 0) + " nearby Kroger locations found. Add items to compare product prices.");
+      }
     } catch (error) {
       setNotice(error instanceof Error ? error.message : "Could not check live prices right now.");
+      setLiveSearchComplete(false);
     } finally {
       setCheckingOffers(false);
     }
   };
 
-  const mapsUrl = "https://www.google.com/maps/search/?api=1&query=" + encodeURIComponent("grocery stores near " + preferences.zip);
-  const deliveryUrl = "https://www.google.com/search?q=" + encodeURIComponent("grocery " + (preferences.mode === "pickup" ? "pickup" : "delivery") + " near " + preferences.zip);
-  const shoppingUrl = "https://www.google.com/search?tbm=shop&q=" + encodeURIComponent(activeItems.slice(0, 5).map((line) => line.ingredient.name).join(" "));
+  const openNearby = () => {
+    navigateTo("shops");
+    void checkLiveOffers();
+  };
+  const openDeliveryOptions = () => {
+    setPreference("mode", preferences.mode === "pickup" ? "pickup" : "delivery");
+    navigateTo("shops");
+    void checkLiveOffers();
+  };
+  const compareProducts = () => {
+    navigateTo("shops");
+    void checkLiveOffers();
+  };
+
+  const clearBasket = () => {
+    setSelectedIds([]);
+    setExtraQuantities({});
+    setQuantityOverrides({});
+    setCheckedItems({});
+    clearLiveMatches();
+    setClearConfirmOpen(false);
+    setMobileCartOpen(false);
+    setNotice("Your entire shopping basket has been cleared.");
+  };
+
 
   return (
     <div className="app-shell" data-theme={theme}>
@@ -289,7 +410,7 @@ export default function App() {
           </button>
           <div className="anonymous-chip" title="No account needed">
             <span className="anon-avatar"><Sprout size={16} /></span>
-            <span>Guest planner</span>
+            <span>{householdProfile ? "Household saved" : "Guest planner"}</span>
           </div>
         </div>
       </header>
@@ -319,84 +440,26 @@ export default function App() {
           </div>
         </section>
 
-        <section className="planner-controls" aria-labelledby="planner-controls-title">
-          <div className="controls-heading">
-            <div>
-              <div className="section-kicker">MAKE IT YOURS <span className="kicker-line" /></div>
-              <h2 id="planner-controls-title">Your plan, your way</h2>
-              <p>Tell us what works for your table this week.</p>
-            </div>
-            <button className="text-button refresh-button" type="button" onClick={generatePlan}><Sparkles size={15} /> Build my plan <ArrowRight size={15} /></button>
+        <section className="household-summary-card" aria-labelledby="household-summary-title">
+          <div className="household-summary-top">
+            <span className="household-summary-icon"><Sparkles size={19}/></span>
+            <span className="household-summary-kicker">YOUR SHOPPING BRIEF</span>
+            {householdProfile ? <span className="saved-profile-label"><ShieldCheck size={13}/> SAVED ON THIS DEVICE</span> : <span className="quick-profile-label">ONE-TIME OR GUEST SHOP</span>}
           </div>
-
-          <div className="control-grid">
-            <label className="control-field location-field">
-              <span className="field-label"><MapPin size={15} /> SHOPPING LOCATION</span>
-              <span className="zip-input-wrap">
-                <input value={preferences.zip} inputMode="numeric" maxLength={5} aria-label="ZIP code" onChange={(event) => setPreference("zip", event.target.value.replace(/\D/g, "").slice(0, 5))} />
-                <span className="location-label">ZIP code</span>
-                <MapPinned size={17} />
-              </span>
-              <span className="field-hint">Used to find nearby shopping options</span>
-            </label>
-
-            <div className="control-field budget-field">
-              <div className="field-label-row">
-                <span className="field-label"><Wallet size={15} /> TOTAL BUDGET</span>
-                <strong className="budget-value">{formatCurrency(preferences.budget)}</strong>
-              </div>
-              <input className="budget-slider" type="range" min="25" max="200" step="5" value={preferences.budget} onChange={(event) => setPreference("budget", Number(event.target.value))} aria-label="Grocery budget" style={{ "--range-progress": ((preferences.budget - 25) / 175 * 100) + "%" } as CSSProperties} />
-              <div className="range-caption"><span>$25</span><span>$200+</span></div>
-              <span className="field-hint">For the whole shopping basket</span>
-            </div>
-
-            <div className="control-field duration-field">
-              <span className="field-label"><Clock3 size={15} /> PLAN LENGTH</span>
-              <div className="segmented duration-segmented" role="group" aria-label="Plan length">
-                {([3, 5, 7] as const).map((days) => (
-                  <button type="button" key={days} onClick={() => setPreference("days", days)} className={preferences.days === days ? "selected" : ""}>
-                    <strong>{days}</strong><span>{"days"}</span>
-                  </button>
-                ))}
-              </div>
-              <span className="field-hint">One dinner idea per day</span>
-            </div>
-
-            <div className="control-field servings-field">
-              <span className="field-label"><Users size={15} /> AT THE TABLE</span>
-              <div className="stepper serving-stepper">
-                <button type="button" aria-label="Decrease servings" disabled={preferences.servings <= 1} onClick={() => setPreference("servings", Math.max(1, preferences.servings - 1))}><Minus size={15} /></button>
-                <span><strong>{preferences.servings}</strong><small>{preferences.servings === 1 ? "person" : "people"}</small></span>
-                <button type="button" aria-label="Increase servings" disabled={preferences.servings >= 8} onClick={() => setPreference("servings", Math.min(8, preferences.servings + 1))}><Plus size={15} /></button>
-              </div>
-              <span className="field-hint">Adjust ingredient quantities</span>
-            </div>
+          <h2 id="household-summary-title">Everything your household needs.</h2>
+          <p>First set the context, then Shopline builds one consolidated list for food, home basics and personal care — with recipe ideas when they help.</p>
+          <div className="household-summary-pills">
+            <span><Users size={14}/> {preferences.servings} {preferences.servings === 1 ? "person" : "people"}</span>
+            <span><Clock3 size={14}/> {preferences.days}-day plan</span>
+            <span><Wallet size={14}/> {formatCurrency(preferences.budget)} budget</span>
+            <span><MapPin size={14}/> {preferences.zip || "ZIP not set"}</span>
+            <span><ShoppingBasket size={14}/> {quizAnswers.groups.length} shopping categories</span>
           </div>
-
-          <div className="controls-bottom">
-            <div className="diet-chooser">
-              <span className="field-label"><SlidersHorizontal size={15} /> FOOD PREFERENCES</span>
-              <div className="diet-options" role="group" aria-label="Dietary preference">
-                {DIET_OPTIONS.map((option) => (
-                  <button type="button" key={option.value} className={preferences.diet === option.value ? "diet-chip selected" : "diet-chip"} onClick={() => setPreference("diet", option.value)}>
-                    <span className="diet-icon">{option.icon}</span>{option.label}
-                  </button>
-                ))}
-              </div>
-            </div>
-            <div className="shopping-mode">
-              <span className="field-label">HOW DO YOU WANT TO SHOP?</span>
-              <div className="mode-options" role="group" aria-label="Shopping preference">
-                {MODE_OPTIONS.map((option) => (
-                  <button className={preferences.mode === option.value ? "mode-option selected" : "mode-option"} key={option.value} type="button" onClick={() => setPreference("mode", option.value)}>
-                    <span className="mode-icon">{option.value === "store" ? <Store size={17} /> : option.value === "pickup" ? <ShoppingBag size={17} /> : <Truck size={17} />}</span>
-                    <span><strong>{option.label}</strong><small>{option.sub}</small></span>
-                    {preferences.mode === option.value && <CheckCircle2 size={15} className="mode-check" />}
-                  </button>
-                ))}
-              </div>
-            </div>
+          <div className="household-summary-actions">
+            <button className="primary-button" type="button" onClick={startPlan}><Sparkles size={16}/> Build my shopping list <ArrowRight size={16}/></button>
+            <button className="secondary-button" type="button" onClick={openQuiz}><SlidersHorizontal size={15}/> {householdProfile ? "Adjust for guests" : "Take the shopping quiz"}</button>
           </div>
+          <div className="household-summary-foot"><ShieldCheck size={14}/><span>{householdProfile ? "Your household preferences are remembered in this browser." : "The quiz runs before each new search. You can save a household locally or keep it one-time for guests."} Account syncing will be added after beta.</span></div>
         </section>
 
         </>}
@@ -447,7 +510,7 @@ export default function App() {
                     )}
                   </div>
                 ) : (
-                  <div className="empty-state"><span><CookingPot size={25} /></span><h3>Your plan is a blank page.</h3><p>Build a plan from your preferences or add a meal from Discover recipes.</p><button className="primary-button" type="button" onClick={generatePlan}>Build a meal plan <ArrowRight size={16} /></button></div>
+                  <div className="empty-state"><span><CookingPot size={25} /></span><h3>Your plan is a blank page.</h3><p>Build a plan from your preferences or add a meal from Discover recipes.</p><button className="primary-button" type="button" onClick={startPlan}>Build a meal plan <ArrowRight size={16} /></button></div>
                 )}
 
                 <section className="store-discovery">
@@ -497,45 +560,82 @@ export default function App() {
                     const lines = basketItems.filter((line) => line.ingredient.category === category);
                     return <section className="grocery-category" key={category}>
                       <div className="category-heading"><h3>{category}</h3><span>{lines.length} {lines.length === 1 ? "item" : "items"}</span></div>
-                      {lines.map((line) => <CartRow key={line.ingredient.id} line={line} onToggle={() => toggleChecked(line)} onQuantity={(delta) => changeQuantity(line, delta)} detailed />)}
+                      {lines.map((line) => <CartRow key={line.ingredient.id} line={line} onToggle={() => toggleChecked(line)} onQuantity={(delta) => changeQuantity(line, delta)} detailed assignment={liveAssignments[line.ingredient.id]} liveChecked={liveSearchComplete} />)}
                     </section>;
                   })}
                   {!basketItems.length && <div className="empty-state"><ShoppingBasket size={25} /><h3>No ingredients yet</h3><p>Add a meal to create your shopping list.</p></div>}
                 </div>
                 <section className="live-prices-card">
                   <div className="live-icon"><Search size={19} /></div>
-                  <div className="live-copy"><h3>{liveConfigured ? "Check current Kroger prices" : "Want store-confirmed prices?"}</h3><p>{liveConfigured ? "Search products at a nearby Kroger location for this ZIP code. Product prices are shown separately from the basket estimate." : "Live product lookups are prepared, but a retailer API key must be configured on the deployment. This demo will not guess current prices."}</p></div>
-                  <button className="secondary-button" type="button" disabled={!liveConfigured || checkingOffers} onClick={checkLiveOffers}>{checkingOffers ? "Checking…" : liveConfigured ? "Check live prices" : "Not connected"} <ArrowRight size={15} /></button>
+                  <div className="live-copy"><h3>{liveConfigured ? "Match products to nearby stores" : "Store matching is not connected"}</h3><p>{liveConfigured ? "Search up to four nearby Kroger stores, compare returned product prices, and assign each item to a store. Unmatched items retain an estimate." : "Live store and price lookup requires a configured Kroger API connection. Your shopping list stays available with indicative estimates."}</p></div>
+                  <button className="secondary-button" type="button" disabled={checkingOffers} onClick={checkLiveOffers}>{checkingOffers ? "Searching…" : "Find stores & prices"} <ArrowRight size={15} /></button>
                 </section>
-                {offers.length > 0 && <OffersPanel offers={offers} location={offerLocation} checkedAt={offerCheckedAt} />}
-                <ShoppingDestinations mode={preferences.mode} zip={preferences.zip} mapsUrl={mapsUrl} deliveryUrl={deliveryUrl} shoppingUrl={shoppingUrl} />
+                {liveSearchComplete && <div className="matching-summary-strip"><CheckCircle2 size={15}/><span>{Object.keys(liveAssignments).length} of {activeItems.length} items matched to store prices. {unmatchedItems.length ? unmatchedItems.length + " still use estimates." : "All active items have a store match."}</span><button type="button" onClick={openNearby}>View route <ArrowRight size={14}/></button></div>}
+                <ShoppingDestinations mode={preferences.mode} zip={preferences.zip} onNearby={openNearby} onDelivery={openDeliveryOptions} onCompare={compareProducts} />
               </>
             )}
 
-            {activeView === "shops" && (
-              <section className="nearby-page">
-                <div className="nearby-feature">
-                  <div className="nearby-feature-copy">
-                    <span className="section-kicker">YOUR NEIGHBORHOOD, MADE SHOPPABLE <span className="kicker-line" /></span>
-                    <h2>Good finds, closer to home.</h2>
-                    <p>Use ZIP <strong>{preferences.zip}</strong> to explore grocery stores, pickup windows, delivery providers and product searches. Retailers confirm today's prices, stock and fees on their own sites.</p>
-                    <div className="nearby-action-row">
-                      <a className="primary-button" href={mapsUrl} target="_blank" rel="noreferrer"><MapPinCheck size={16} /> Explore nearby stores <ArrowUpRight size={15} /></a>
-                      <a className="secondary-button" href={deliveryUrl} target="_blank" rel="noreferrer"><Truck size={16} /> {preferences.mode === "pickup" ? "Find pickup" : "Explore delivery"}</a>
-                    </div>
-                  </div>
-                  <div className="nearby-feature-visual">
-                    <div className="nearby-glow nearby-glow-one" />
-                    <div className="nearby-glow nearby-glow-two" />
-                    <span className="nearby-map-icon"><MapPinCheck size={25} /></span>
-                    <span className="nearby-map-label">YOUR SEARCH AREA</span>
-                    <strong>{preferences.zip}</strong>
-                    <span className="nearby-map-caption">Stores and options in your area</span>
-                    <a href={mapsUrl} target="_blank" rel="noreferrer" aria-label="Open a map of nearby grocery stores"><ArrowUpRight size={16} /></a>
-                  </div>
+             {activeView === "shops" && (
+              <section className="shopping-results-page">
+                <div className="shopping-results-header">
+                  <div><span className="section-kicker">LOCAL SHOPPING, WITHOUT THE TAB CHAOS <span className="kicker-line"/></span><h2>Find it. Price it. Route it.</h2><p className="section-description">Nearby Kroger locations, current product matches, and all your stops in one workspace.</p></div>
+                  <button className="secondary-button" type="button" disabled={checkingOffers} onClick={checkLiveOffers}>{checkingOffers ? <><RefreshCw size={14} className="spin-icon"/> Updating…</> : <><RefreshCw size={14}/> Refresh prices</>}</button>
                 </div>
-                <ShoppingDestinations mode={preferences.mode} zip={preferences.zip} mapsUrl={mapsUrl} deliveryUrl={deliveryUrl} shoppingUrl={shoppingUrl} />
-                <div className="nearby-note"><Info size={15} /><span>Shopline is a planning companion, not a retailer. The retailer's page is the source of truth for current offers, stock, checkout totals, taxes and delivery fees.</span></div>
+                <div className="shop-status-strip">
+                  <span className={"shop-status-dot" + (liveSearchComplete ? " complete" : "")}/>
+                  <span><strong>{preferences.zip || "Location required"}</strong><small>{offerCheckedAt ? "Last checked " + new Date(offerCheckedAt).toLocaleString([], { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }) : "Your ZIP is used only when you search for nearby stores."}</small></span>
+                  <span className="shop-status-total"><small>ESTIMATED / MATCHED TOTAL</small><strong>{formatCurrency(basketTotal)}</strong></span>
+                </div>
+
+                {!liveSearchComplete && (
+                  <div className="store-search-empty">
+                    <span className="store-search-empty-icon"><MapPinned size={27}/></span>
+                    <h3>Let’s find your best shopping stops.</h3>
+                    <p>Shopline will search nearby stores, find matching products where the provider returns them, and group the basket into store stops. It won’t pretend unmatched prices are live.</p>
+                    <button className="primary-button" type="button" disabled={checkingOffers} onClick={checkLiveOffers}>{checkingOffers ? "Searching nearby stores…" : "Find nearby stores & prices"} <ArrowRight size={15}/></button>
+                    {!liveConfigured && <span className="shop-empty-footnote">Retailer API credentials are not connected in this deployment.</span>}
+                  </div>
+                )}
+
+                {liveSearchComplete && routeStops.length > 0 && (
+                  <>
+                    <Suspense fallback={<div className="route-map-skeleton"><span className="mini-spinner"/> Loading interactive map…</div>}>
+                      <RouteMap stops={routeStops} origin={sharedLocation}/>
+                    </Suspense>
+                    <div className="route-stops-section">
+                      <div className="route-stops-heading"><div><span className="section-kicker">YOUR STOP-BY-STOP PLAN <span className="kicker-line"/></span><h3>One route, grouped baskets.</h3></div><span>{routeStops.length} {routeStops.length === 1 ? "stop" : "stops"}</span></div>
+                      <div className="route-stop-list">
+                        {routeStops.map((stop, index) => (
+                          <article className="route-stop-card" key={stop.id}>
+                            <div className="route-stop-number">{String(index + 1).padStart(2, "0")}</div>
+                            <div className="route-stop-main">
+                              <div className="route-stop-title"><div><h4>{stop.name}</h4><p>{stop.address || "Address not provided by the store API"}</p></div><strong>{formatCurrency(stop.subtotal)}</strong></div>
+                              <div className="route-stop-items">{stop.items.map((item) => <span key={item}>{item}</span>)}</div>
+                              <div className="route-stop-foot"><span><ShoppingBasket size={13}/> {stop.itemCount} packages matched</span><span><CheckCircle2 size={13}/> Product match returned by Kroger</span></div>
+                            </div>
+                          </article>
+                        ))}
+                      </div>
+                      <p className="route-disclaimer"><Info size={14}/> Stops are grouped around matched Kroger products and ordered by a distance-efficient estimate. Store stock, final price, taxes and delivery fees must still be confirmed by the retailer.</p>
+                    </div>
+                  </>
+                )}
+
+                {liveSearchComplete && unmatchedItems.length > 0 && (
+                  <section className="unmatched-products">
+                    <div><span className="unmatched-icon"><Info size={16}/></span><span><strong>{unmatchedItems.length} items without a live store match</strong><small>Kept in your basket at indicative planning prices; they are not silently removed.</small></span></div>
+                    <div className="unmatched-product-list">{unmatchedItems.map((line) => <span key={line.ingredient.id}>{line.ingredient.name}</span>)}</div>
+                  </section>
+                )}
+
+                {liveSearchComplete && storeLocations.length > 0 && (
+                  <section className="nearby-location-list">
+                    <div className="route-stops-heading"><div><span className="section-kicker">AROUND YOUR ZIP <span className="kicker-line"/></span><h3>Nearby Kroger locations</h3></div><span>{storeLocations.length} found</span></div>
+                    <div className="nearby-location-grid">{storeLocations.map((store) => <article className="nearby-location-card" key={store.id}><span className="nearby-location-icon"><Store size={17}/></span><span><strong>{store.name}</strong><small>{store.address || "Address unavailable"}</small></span>{routeStops.some((stop) => stop.id === store.id) ? <span className="location-status matched">On route</span> : <span className="location-status">Nearby</span>}</article>)}</div>
+                  </section>
+                )}
+
+                <ShoppingDestinations mode={preferences.mode} zip={preferences.zip} onNearby={openNearby} onDelivery={openDeliveryOptions} onCompare={compareProducts}/>
               </section>
             )}
           </div>
@@ -544,6 +644,7 @@ export default function App() {
             <div className="basket-panel">
               <div className="basket-heading">
                 <div><div className="basket-overline"><span className="basket-pulse" /> YOUR GROCERY LIST</div><h2>The basket <span>{activeItems.length}</span></h2></div>
+                {basketItems.length > 0 && <button className="clear-basket-trigger" type="button" onClick={() => setClearConfirmOpen(true)} aria-label="Clear the entire basket" title="Clear entire basket"><Trash2 size={15}/></button>}
                 <button className="basket-close-mobile" type="button" aria-label="Close basket" onClick={() => setMobileCartOpen(false)}><X size={18} /></button>
                 <span className="basket-heading-icon"><ShoppingBasket size={19} /></span>
               </div>
@@ -559,7 +660,7 @@ export default function App() {
 
               {basketItems.length > 0 ? (
                 <div className="quick-cart-list">
-                  {basketItems.map((line) => <CartRow key={line.ingredient.id} line={line} onToggle={() => toggleChecked(line)} onQuantity={(delta) => changeQuantity(line, delta)} />)}
+                  {basketItems.map((line) => <CartRow key={line.ingredient.id} line={line} onToggle={() => toggleChecked(line)} onQuantity={(delta) => changeQuantity(line, delta)} assignment={liveAssignments[line.ingredient.id]} liveChecked={liveSearchComplete} />)}
                 </div>
               ) : (
                 <div className="quick-cart-empty"><ShoppingBasket size={24} /><p>Add meals to see ingredients here.</p></div>
@@ -588,6 +689,17 @@ export default function App() {
       </main>
 
       {detailRecipe && <RecipeModal recipe={detailRecipe} servings={preferences.servings} onClose={() => setDetailRecipe(null)} onAdd={() => { toggleRecipe(detailRecipe); setDetailRecipe(null); }} selected={selectedIds.includes(detailRecipe.id)} />}
+      {quizOpen && <ShoppingQuiz initial={quizAnswers} onClose={() => setQuizOpen(false)} onComplete={applyQuizAnswers}/>}
+      {clearConfirmOpen && (
+        <div className="clear-confirm-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setClearConfirmOpen(false); }}>
+          <section className="clear-confirm-modal" role="dialog" aria-modal="true" aria-labelledby="clear-confirm-title">
+            <span className="clear-confirm-icon"><Trash2 size={22}/></span>
+            <h2 id="clear-confirm-title">Empty the entire basket?</h2>
+            <p>This removes all selected meals, household essentials, quantities and store matches. Your saved household preferences will stay.</p>
+            <div className="clear-confirm-actions"><button className="secondary-button" type="button" onClick={() => setClearConfirmOpen(false)}>Keep my list</button><button className="danger-button" type="button" onClick={clearBasket}><Trash2 size={14}/> Empty basket</button></div>
+          </section>
+        </div>
+      )}
       {mobileCartOpen && <button className="mobile-cart-scrim" type="button" onClick={() => setMobileCartOpen(false)} aria-label="Close shopping basket overlay" />}
       {notice && <div className="toast" role="status"><CheckCircle2 size={17} /><span>{notice}</span><button type="button" onClick={() => setNotice("")} aria-label="Dismiss message"><X size={15} /></button></div>}
     </div>
