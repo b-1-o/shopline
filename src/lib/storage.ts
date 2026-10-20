@@ -1,4 +1,4 @@
-import type { Preferences } from "../types";
+import type { Preferences, QuizAnswers } from "../types";
 
 const PREFIX = "shopline.beta.";
 
@@ -35,10 +35,25 @@ export function getAnonymousSessionId(): string {
 }
 
 export const DEFAULT_PREFERENCES: Preferences = {
-  zip: "91605",
-  budget: 75,
-  days: 5,
+  zip: "",
+  budget: 350,
+  days: 7,
   servings: 2,
   diet: "all",
   mode: "store"
+};
+
+export const DEFAULT_QUIZ_ANSWERS: QuizAnswers = {
+  zip: "",
+  budget: 350,
+  days: 7,
+  servings: 2,
+  diet: "all",
+  mode: "store",
+  groups: ["food", "paper", "cleaning", "personal-care"],
+  allergies: [],
+  alreadyHave: [],
+  hasKids: false,
+  hasPets: false,
+  profileMode: "ask"
 };

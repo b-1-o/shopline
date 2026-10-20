@@ -160,3 +160,27 @@ export const RECIPES: Recipe[] = [
     steps: ["Cook rice. Press tofu dry and cut into cubes.", "Sear tofu in a hot non-stick skillet until golden on most sides.", "Heat edamame and slice carrots into ribbons. Mix soy sauce, sesame oil and minced garlic.", "Build bowls with rice, tofu, edamame and carrots; drizzle with dressing."]
   }
 ];
+
+export const HOUSEHOLD_ITEMS: Ingredient[] = [
+  { id: "toilet-paper", name: "Toilet paper", category: "Paper goods", kind: "paper", price: 12.99, packSize: 1, unit: "pack", packageLabel: "12 mega rolls", searchTerm: "toilet paper 12 mega rolls" },
+  { id: "paper-towels", name: "Paper towels", category: "Paper goods", kind: "paper", price: 9.49, packSize: 1, unit: "pack", packageLabel: "6 double rolls", searchTerm: "paper towels 6 double rolls" },
+  { id: "tissues", name: "Facial tissues", category: "Paper goods", kind: "paper", price: 5.49, packSize: 1, unit: "pack", packageLabel: "3 tissue boxes", searchTerm: "facial tissues 3 boxes" },
+  { id: "trash-bags", name: "Trash bags", category: "Paper goods", kind: "paper", price: 8.49, packSize: 1, unit: "pack", packageLabel: "45-count box", searchTerm: "kitchen trash bags 45 count" },
+  { id: "dish-soap", name: "Dish soap", category: "Cleaning", kind: "cleaning", price: 3.49, packSize: 1, unit: "bottle", packageLabel: "24 fl oz bottle", searchTerm: "dish soap 24 oz" },
+  { id: "laundry-detergent", name: "Laundry detergent", category: "Cleaning", kind: "cleaning", price: 12.99, packSize: 1, unit: "bottle", packageLabel: "standard bottle", searchTerm: "laundry detergent bottle" },
+  { id: "surface-cleaner", name: "All-purpose cleaner", category: "Cleaning", kind: "cleaning", price: 4.99, packSize: 1, unit: "bottle", packageLabel: "spray bottle", searchTerm: "all purpose household cleaner spray" },
+  { id: "sponges", name: "Cleaning sponges", category: "Cleaning", kind: "cleaning", price: 3.49, packSize: 1, unit: "pack", packageLabel: "6-count pack", searchTerm: "kitchen cleaning sponges 6 pack" },
+  { id: "dishwasher-tabs", name: "Dishwasher tablets", category: "Cleaning", kind: "cleaning", price: 8.99, packSize: 1, unit: "pack", packageLabel: "standard pack", searchTerm: "dishwasher detergent tablets" },
+  { id: "toothpaste", name: "Toothpaste", category: "Personal care", kind: "personal-care", price: 4.99, packSize: 1, unit: "pack", packageLabel: "2 tubes", searchTerm: "toothpaste 2 pack" },
+  { id: "toothbrushes", name: "Toothbrushes", category: "Personal care", kind: "personal-care", price: 4.49, packSize: 1, unit: "pack", packageLabel: "2-count pack", searchTerm: "soft toothbrush 2 pack" },
+  { id: "shampoo", name: "Shampoo", category: "Personal care", kind: "personal-care", price: 7.99, packSize: 1, unit: "bottle", packageLabel: "standard bottle", searchTerm: "shampoo bottle" },
+  { id: "body-wash", name: "Body wash", category: "Personal care", kind: "personal-care", price: 6.99, packSize: 1, unit: "bottle", packageLabel: "standard bottle", searchTerm: "body wash bottle" },
+  { id: "deodorant", name: "Deodorant", category: "Personal care", kind: "personal-care", price: 6.49, packSize: 1, unit: "stick", packageLabel: "1 stick", searchTerm: "deodorant stick" },
+  { id: "razors", name: "Shaving razors", category: "Personal care", kind: "personal-care", price: 9.99, packSize: 1, unit: "pack", packageLabel: "4 disposable razors", searchTerm: "disposable shaving razors 4 pack" },
+  { id: "shaving-cream", name: "Shaving cream", category: "Personal care", kind: "personal-care", price: 4.49, packSize: 1, unit: "can", packageLabel: "standard can", searchTerm: "shaving cream can" },
+  { id: "period-care", name: "Period care", category: "Personal care", kind: "personal-care", price: 7.99, packSize: 1, unit: "pack", packageLabel: "standard pack", searchTerm: "unscented period care pads" },
+  { id: "baby-wipes", name: "Baby wipes", category: "Baby & pets", kind: "baby-pet", householdFor: "kids", price: 3.99, packSize: 1, unit: "pack", packageLabel: "standard pack", searchTerm: "baby wipes pack" },
+  { id: "diapers", name: "Diapers", category: "Baby & pets", kind: "baby-pet", householdFor: "kids", price: 19.99, packSize: 1, unit: "pack", packageLabel: "standard pack", searchTerm: "baby diapers pack" },
+  { id: "dog-food", name: "Dog food", category: "Baby & pets", kind: "baby-pet", householdFor: "pets", price: 11.99, packSize: 1, unit: "bag", packageLabel: "small bag", searchTerm: "dry dog food bag" },
+  { id: "cat-litter", name: "Cat litter", category: "Baby & pets", kind: "baby-pet", householdFor: "pets", price: 13.99, packSize: 1, unit: "box", packageLabel: "standard box", searchTerm: "cat litter box" }
+];
