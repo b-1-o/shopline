@@ -14,8 +14,8 @@ function queryValue(value: string | string[] | undefined): string {
 }
 
 async function getKrogerToken(): Promise<string> {
-  const clientId = process.env.KROGER_CLIENT_ID;
-  const clientSecret = process.env.KROGER_CLIENT_SECRET;
+  const clientId = process.env.CLIENT_ID || process.env.KROGER_CLIENT_ID;
+  const clientSecret = process.env.CLIENT_SECRET || process.env.KROGER_CLIENT_SECRET;
   if (!clientId || !clientSecret) throw new Error("Kroger credentials are not configured");
 
   const credentials = Buffer.from(clientId + ":" + clientSecret).toString("base64");
@@ -42,7 +42,10 @@ export default async function handler(req: ApiRequest, res: ApiResponse): Promis
     return;
   }
 
-  const configured = Boolean(process.env.KROGER_CLIENT_ID && process.env.KROGER_CLIENT_SECRET);
+  const configured = Boolean(
+    (process.env.CLIENT_ID || process.env.KROGER_CLIENT_ID) &&
+    (process.env.CLIENT_SECRET || process.env.KROGER_CLIENT_SECRET)
+  );
   if (queryValue(req.query?.action) === "status") {
     res.status(200).json({ configured, provider: configured ? "Kroger" : null, mode: configured ? "live-available" : "estimate" });
     return;
