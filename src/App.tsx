@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import type { CSSProperties } from "react";
 import {
   ArrowDownToLine, ArrowLeft, ArrowRight, ArrowUpRight, BadgeCheck, Check,
   CheckCircle2, ChefHat, ChevronDown, Clock3, CookingPot, ExternalLink,
@@ -317,7 +318,7 @@ export default function App() {
                 <span className="field-label"><Wallet size={15} /> TOTAL BUDGET</span>
                 <strong className="budget-value">{formatCurrency(preferences.budget)}</strong>
               </div>
-              <input className="budget-slider" type="range" min="25" max="200" step="5" value={preferences.budget} onChange={(event) => setPreference("budget", Number(event.target.value))} aria-label="Grocery budget" style={{ "--range-progress": ((preferences.budget - 25) / 175 * 100) + "%" } as React.CSSProperties} />
+              <input className="budget-slider" type="range" min="25" max="200" step="5" value={preferences.budget} onChange={(event) => setPreference("budget", Number(event.target.value))} aria-label="Grocery budget" style={{ "--range-progress": ((preferences.budget - 25) / 175 * 100) + "%" } as CSSProperties} />
               <div className="range-caption"><span>$25</span><span>$200+</span></div>
               <span className="field-hint">For the whole shopping basket</span>
             </div>
