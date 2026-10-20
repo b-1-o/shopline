@@ -7,7 +7,7 @@ import {
   Sprout, Store, Truck, Users, Wallet, X, Moon, Sun, MapPinCheck, Trash2, RefreshCw, ShieldCheck
 } from "lucide-react";
 import { HOUSEHOLD_ITEMS, INGREDIENTS, RECIPES } from "./data";
-import { buildBasket, buildHouseholdQuantities, buildPlan, buildShoppingText, estimateRecipeCost, formatCurrency, matchesAllergies, matchesDiet, optimizeStoreStops } from "./lib/planner";
+import { buildBasket, buildHouseholdQuantities, buildPlan, buildShoppingText, buildStorePlanAssignments, estimateRecipeCost, formatCurrency, matchesAllergies, matchesDiet, optimizeStoreStops } from "./lib/planner";
 import { DEFAULT_PREFERENCES, DEFAULT_QUIZ_ANSWERS, getAnonymousSessionId, readStored, writeStored } from "./lib/storage";
 import type { CartLine, Diet, Ingredient, LiveOffer, Preferences, QuizAnswers, Recipe, ShoppingMode, StoreAssignment, StorePoint, StoreStop, ViewName } from "./types";
 import ShoppingQuiz from "./components/ShoppingQuiz";
@@ -151,9 +151,13 @@ export default function App() {
   const eligibleRecipes = RECIPES.filter((recipe) => matchesDiet(recipe, preferences.diet) && matchesAllergies(recipe, quizAnswers.allergies));
   const visibleRecipes = activeView === "recipes" ? eligibleRecipes : selectedRecipes;
   const currencyPerMeal = selectedRecipes.length ? basketTotal / selectedRecipes.length : 0;
+  const storePlanAssignments = useMemo(
+    () => buildStorePlanAssignments(basketItems, liveAssignments, storeLocations),
+    [basketItems, liveAssignments, storeLocations]
+  );
   const routeStops = useMemo(
-    () => optimizeStoreStops(basketItems, liveAssignments, sharedLocation || searchCenter),
-    [basketItems, liveAssignments, sharedLocation, searchCenter]
+    () => optimizeStoreStops(basketItems, storePlanAssignments, sharedLocation || searchCenter),
+    [basketItems, storePlanAssignments, sharedLocation, searchCenter]
   );
   const unmatchedItems = activeItems.filter((line) => !liveAssignments[line.ingredient.id]);
 
@@ -600,7 +604,7 @@ export default function App() {
                     const lines = basketItems.filter((line) => line.ingredient.category === category);
                     return <section className="grocery-category" key={category}>
                       <div className="category-heading"><h3>{category}</h3><span>{lines.length} {lines.length === 1 ? "item" : "items"}</span></div>
-                      {lines.map((line) => <CartRow key={line.ingredient.id} line={line} onToggle={() => toggleChecked(line)} onQuantity={(delta) => changeQuantity(line, delta)} detailed assignment={liveAssignments[line.ingredient.id]} liveChecked={liveSearchComplete && liveConfigured} />)}
+                      {lines.map((line) => <CartRow key={line.ingredient.id} line={line} onToggle={() => toggleChecked(line)} onQuantity={(delta) => changeQuantity(line, delta)} detailed assignment={liveAssignments[line.ingredient.id]} suggestedStore={storePlanAssignments[line.ingredient.id]?.store} liveChecked={liveSearchComplete && liveConfigured} />)}
                     </section>;
                   })}
                   {!basketItems.length && <div className="empty-state"><ShoppingBasket size={25} /><h3>No ingredients yet</h3><p>Add a meal to create your shopping list.</p></div>}
@@ -664,12 +668,16 @@ export default function App() {
                             <div className="route-stop-main">
                               <div className="route-stop-title"><div><h4>{stop.name}</h4><p>{stop.address || "Address not provided by the store API"}</p></div><strong>{formatCurrency(stop.subtotal)}</strong></div>
                               <div className="route-stop-items">{stop.items.map((item) => <span key={item}>{item}</span>)}</div>
-                              <div className="route-stop-foot"><span><ShoppingBasket size={13}/> {stop.itemCount} packages matched</span><span><CheckCircle2 size={13}/> Product match returned by Kroger</span></div>
+                              <div className="route-stop-foot">
+                                 <span><ShoppingBasket size={13}/> {stop.itemCount} packages planned</span>
+                                 {stop.liveItemCount > 0 && <span><CheckCircle2 size={13}/> {stop.liveItemCount} packages with live prices</span>}
+                                 {stop.estimatedItemCount > 0 && <span><MapPinned size={13}/> {stop.estimatedItemCount} packages estimated · availability unverified</span>}
+                               </div>
                             </div>
                           </article>
                         ))}
                       </div>
-                      <p className="route-disclaimer"><Info size={14}/> Stops are grouped around matched Kroger products and ordered by a distance-efficient estimate. Store stock, final price, taxes and delivery fees must still be confirmed by the retailer.</p>
+                      <p className="route-disclaimer"><Info size={14}/> Where Kroger returned an offer, the stop uses that product price. Other items are assigned to a nearby mapped shop for planning only; product availability, estimated prices, taxes and fees must be confirmed before shopping.</p>
                     </div>}
                   </>
                 )}
@@ -687,8 +695,8 @@ export default function App() {
 
                 {liveSearchComplete && storeLocations.length > 0 && (
                   <section className="nearby-location-list">
-                    <div className="route-stops-heading"><div><span className="section-kicker">AROUND YOUR ZIP <span className="kicker-line"/></span><h3>Nearby Kroger locations</h3></div><span>{storeLocations.length} found</span></div>
-                    <div className="nearby-location-grid">{storeLocations.map((store) => <article className="nearby-location-card" key={store.id}><span className="nearby-location-icon"><Store size={17}/></span><span><strong>{store.name}</strong><small>{store.address || "Address unavailable"}</small></span>{routeStops.some((stop) => stop.id === store.id) ? <span className="location-status matched">On route</span> : <span className="location-status">Nearby</span>}</article>)}</div>
+                    <div className="route-stops-heading"><div><span className="section-kicker">AROUND YOUR ZIP <span className="kicker-line"/></span><h3>Nearby shopping locations</h3></div><span>{storeLocations.length} found</span></div>
+                    <div className="nearby-location-grid">{storeLocations.map((store) => <article className="nearby-location-card" key={store.id}><span className="nearby-location-icon"><Store size={17}/></span><span><strong>{store.name}</strong><small>{store.address || "Address unavailable"}{typeof store.distance === "number" ? " · " + store.distance.toFixed(1) + " mi away" : ""}</small></span>{routeStops.some((stop) => stop.id === store.id) ? <span className="location-status matched">On route</span> : <span className="location-status">Nearby</span>}</article>)}</div>
                   </section>
                 )}
 
@@ -717,7 +725,7 @@ export default function App() {
 
               {basketItems.length > 0 ? (
                 <div className="quick-cart-list">
-                  {basketItems.map((line) => <CartRow key={line.ingredient.id} line={line} onToggle={() => toggleChecked(line)} onQuantity={(delta) => changeQuantity(line, delta)} assignment={liveAssignments[line.ingredient.id]} liveChecked={liveSearchComplete} />)}
+                  {basketItems.map((line) => <CartRow key={line.ingredient.id} line={line} onToggle={() => toggleChecked(line)} onQuantity={(delta) => changeQuantity(line, delta)} assignment={liveAssignments[line.ingredient.id]} suggestedStore={storePlanAssignments[line.ingredient.id]?.store} liveChecked={liveSearchComplete && liveConfigured} />)}
                 </div>
               ) : (
                 <div className="quick-cart-empty"><ShoppingBasket size={24} /><p>Add meals to see ingredients here.</p></div>
@@ -863,6 +871,7 @@ function CartRow({
   onQuantity,
   detailed = false,
   assignment,
+  suggestedStore,
   liveChecked = false
 }: {
   line: CartLine;
@@ -870,6 +879,7 @@ function CartRow({
   onQuantity: (delta: number) => void;
   detailed?: boolean;
   assignment?: StoreAssignment;
+  suggestedStore?: StorePoint;
   liveChecked?: boolean;
 }) {
   const liveUnitPrice = assignment ? (assignment.promoPrice && assignment.promoPrice > 0 ? assignment.promoPrice : assignment.price) : line.ingredient.price;
@@ -887,10 +897,12 @@ function CartRow({
         <span>{line.ingredient.packageLabel}{detailed ? " · needs " + quantityText(line.amountNeeded, line.amountUnit) : ""}</span>
         <span className={"cart-store-label" + (assignment ? " matched" : liveChecked ? " unmatched" : "")}>
           {assignment
-            ? <><Store size={11}/><span>{assignment.store.name}{assignment.size ? " · " + assignment.size : ""}</span></>
-            : liveChecked
-              ? <><Info size={11}/><span>No nearby match · estimate</span></>
-              : <><MapPin size={11}/><span>Store pending price check</span></>}
+            ? <><Store size={11}/><span>{assignment.store.name}{assignment.size ? " · " + assignment.size : ""} · live price</span></>
+            : suggestedStore
+              ? <><MapPin size={11}/><span>{suggestedStore.name} · {liveChecked ? "no live match" : "estimate only"}</span></>
+              : liveChecked
+                ? <><Info size={11}/><span>No nearby match · estimate</span></>
+                : <><MapPin size={11}/><span>Store pending search</span></>}
         </span>
       </div>
       <div className="cart-row-end">

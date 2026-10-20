@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { HOUSEHOLD_ITEMS, INGREDIENTS, RECIPES } from "../data";
-import { buildBasket, buildHouseholdQuantities, buildPlan, matchesAllergies, matchesDiet, optimizeStoreStops } from "./planner";
+import { buildBasket, buildHouseholdQuantities, buildPlan, buildStorePlanAssignments, matchesAllergies, matchesDiet, optimizeStoreStops } from "./planner";
 import { DEFAULT_QUIZ_ANSWERS } from "./storage";
 import type { QuizAnswers, StoreAssignment } from "../types";
 
@@ -77,6 +77,24 @@ describe("Shopline planning", () => {
     const stops = optimizeStoreStops(sampleLines, assignments);
     expect(stops).toHaveLength(2);
     expect(stops.reduce((sum, stop) => sum + stop.itemCount, 0)).toBe(sampleLines.reduce((sum, line) => sum + line.quantity, 0));
+  });
+
+  it("suggests the nearest mapped shop for unmatched items without calling estimates live prices", () => {
+    const lines = buildBasket([], HOUSEHOLD_ITEMS, 2, {}, {}, { "toilet-paper": 2, "dish-soap": 1 });
+    const sampleLines = lines.filter((line) => ["toilet-paper", "dish-soap"].includes(line.ingredient.id));
+    const farther = { id: "far-shop", name: "Far Market", address: "10 North St", latitude: 34.2, longitude: -118.3, distance: 5.2 };
+    const closer = { id: "close-shop", name: "Local Market", address: "2 Main St", latitude: 34.1, longitude: -118.2, distance: 0.8 };
+    const assignments = buildStorePlanAssignments(sampleLines, {}, [farther, closer]);
+
+    expect(assignments["toilet-paper"].store.id).toBe("close-shop");
+    expect(assignments["dish-soap"].source).toContain("estimated price");
+    expect(assignments["dish-soap"].price).toBe(sampleLines.find((line) => line.ingredient.id === "dish-soap")?.ingredient.price);
+
+    const stops = optimizeStoreStops(sampleLines, assignments);
+    expect(stops).toHaveLength(1);
+    expect(stops[0].estimatedItemCount).toBeGreaterThan(0);
+    expect(stops[0].liveItemCount).toBe(0);
+    expect(stops[0].items.some((item) => item.includes("×"))).toBe(true);
   });
 
 });

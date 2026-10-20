@@ -1,5 +1,5 @@
 import type {
-  CartLine, Diet, Ingredient, ProductGroup, QuizAnswers, Recipe, StoreAssignment, StoreStop
+  CartLine, Diet, Ingredient, ProductGroup, QuizAnswers, Recipe, StoreAssignment, StorePoint, StoreStop
 } from "../types";
 
 export function matchesDiet(recipe: Recipe, diet: Diet): boolean {
@@ -135,6 +135,33 @@ export function buildPlan(
   return selected.map((recipe) => recipe.id);
 }
 
+export function buildStorePlanAssignments(
+  lines: CartLine[],
+  liveAssignments: Record<string, StoreAssignment>,
+  stores: StorePoint[]
+): Record<string, StoreAssignment> {
+  const result: Record<string, StoreAssignment> = { ...liveAssignments };
+  const nearbyStores = stores
+    .filter((store) => typeof store.latitude === "number" && typeof store.longitude === "number")
+    .slice()
+    .sort((a, b) => (a.distance ?? Number.POSITIVE_INFINITY) - (b.distance ?? Number.POSITIVE_INFINITY));
+  if (!nearbyStores.length) return result;
+
+  const suggestedStore = nearbyStores[0];
+  lines.filter((line) => line.quantity > 0).forEach((line) => {
+    if (result[line.ingredient.id]) return;
+    result[line.ingredient.id] = {
+      ingredientId: line.ingredient.id,
+      query: line.ingredient.searchTerm || line.ingredient.name,
+      name: line.ingredient.name,
+      price: line.ingredient.price,
+      source: "Suggested nearby store — estimated price, availability unverified",
+      store: suggestedStore
+    };
+  });
+  return result;
+}
+
 export function optimizeStoreStops(
   lines: CartLine[],
   assignments: Record<string, StoreAssignment>,
@@ -149,10 +176,14 @@ export function optimizeStoreStops(
       ...store,
       items: [],
       subtotal: 0,
-      itemCount: 0
+      itemCount: 0,
+      liveItemCount: 0,
+      estimatedItemCount: 0
     };
-    stop.items.push(line.ingredient.name);
+    stop.items.push(line.ingredient.name + " × " + line.quantity);
     stop.itemCount += line.quantity;
+    if (assignment.source === "Kroger") stop.liveItemCount += line.quantity;
+    else stop.estimatedItemCount += line.quantity;
     stop.subtotal += line.quantity * (assignment.promoPrice && assignment.promoPrice > 0 ? assignment.promoPrice : assignment.price);
     grouped.set(store.id, stop);
   });

@@ -52,7 +52,7 @@ export interface StoreAssignment {
   ingredientId: string; query: string; name: string; brand?: string; price: number; promoPrice?: number | null;
   size?: string; productId?: string; imageUrl?: string; source: string; store: StorePoint;
 }
-export interface StoreStop extends StorePoint { items: string[]; subtotal: number; itemCount: number; }
+export interface StoreStop extends StorePoint { items: string[]; subtotal: number; itemCount: number; liveItemCount: number; estimatedItemCount: number; }
 export interface RouteSummary { coordinates: Array<[number, number]>; distanceMeters: number; durationSeconds: number; source: string; }
 export interface AccountProfile { id: string; email: string; displayName: string; createdAt: string; }
 export type SessionIdentity =
