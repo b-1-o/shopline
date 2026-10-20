@@ -7,6 +7,8 @@ Shopline is a responsive, no-account grocery-planning beta built with React, Typ
 ## Beta features
 
 - Budget-aware meal planning for 3, 5 or 7 dinner ideas.
+- Separate Plan, Recipes, Grocery list and Nearby shopping screens with animated enter/exit transitions.
+- Persistent dark glass theme with berry accents, plus a light theme toggle.
 - Dietary filters, adjustable household size and store / pickup / delivery intent.
 - Recipe cards with preparation steps, estimated cooking times and ingredient lists.
 - Consolidated shopping list with package estimates, quantity edits, check-off state and text export.
@@ -19,7 +21,7 @@ Shopline is a responsive, no-account grocery-planning beta built with React, Typ
 
 The included sample catalog contains **indicative planning estimates**, not live quotes. Retail prices, package size, promotions, delivery fees, taxes and stock vary by retailer and store. The app does not label the fallback catalog as live or guaranteed.
 
-For live Kroger product lookups, configure KROGER_CLIENT_ID and KROGER_CLIENT_SECRET as server-side environment variables in your Vercel project. Do not put these secrets in browser-side VITE_ variables. The API route searches the nearest returned Kroger location and reads the current prices supplied by Kroger at request time. Availability depends on API account access, store coverage and provider limits.
+For live Kroger product lookups, configure CLIENT_ID and CLIENT_SECRET as server-side environment variables in your Vercel project (these are already present in the current Vercel configuration). The server adapter also accepts KROGER_CLIENT_ID and KROGER_CLIENT_SECRET as aliases. Do not put these secrets in browser-side VITE_ variables. The API route searches the nearest returned Kroger location and reads the current prices supplied by Kroger at request time. Availability depends on API account access, store coverage and provider limits.
 
 Official references:
 - Kroger Public APIs: https://www.postman.com/kroger/the-kroger-co-s-public-workspace/overview
