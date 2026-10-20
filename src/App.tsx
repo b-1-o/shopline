@@ -1,11 +1,11 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { CSSProperties } from "react";
 import {
   ArrowDownToLine, ArrowLeft, ArrowRight, ArrowUpRight, BadgeCheck, Check,
   CheckCircle2, ChefHat, ChevronDown, Clock3, CookingPot, ExternalLink,
   Heart, Info, Leaf, ListChecks, MapPin, MapPinned, Minus, Plus, Search,
   ShoppingBag, ShoppingBasket, ShoppingCart, SlidersHorizontal, Sparkles,
-  Sprout, Store, Truck, Users, Wallet, X
+  Sprout, Store, Truck, Users, Wallet, X, Moon, Sun, MapPinCheck
 } from "lucide-react";
 import { INGREDIENTS, RECIPES } from "./data";
 import { buildBasket, buildPlan, buildShoppingText, estimateRecipeCost, formatCurrency, matchesDiet } from "./lib/planner";
@@ -83,6 +83,9 @@ export default function App() {
   const [quantityOverrides, setQuantityOverrides] = useState<Record<string, number>>(() => readStored("quantities", {}));
   const [checkedItems, setCheckedItems] = useState<Record<string, boolean>>(() => readStored("checked", {}));
   const [activeView, setActiveView] = useState<ViewName>("planner");
+  const [theme, setTheme] = useState<"dark" | "light">(() => readStored<"dark" | "light">("theme", "dark"));
+  const [viewLeaving, setViewLeaving] = useState(false);
+  const viewTimer = useRef<number | undefined>(undefined);
   const [detailRecipe, setDetailRecipe] = useState<Recipe | null>(null);
   const [notice, setNotice] = useState("");
   const [liveConfigured, setLiveConfigured] = useState(false);
@@ -118,6 +121,14 @@ export default function App() {
   }, [preferences, selectedIds, quantityOverrides, checkedItems]);
 
   useEffect(() => {
+    writeStored("theme", theme);
+  }, [theme]);
+
+  useEffect(() => () => {
+    if (viewTimer.current !== undefined) window.clearTimeout(viewTimer.current);
+  }, []);
+
+  useEffect(() => {
     let active = true;
     fetch("/api/prices?action=status")
       .then((response) => response.ok ? response.json() : null)
@@ -131,6 +142,17 @@ export default function App() {
     const timer = window.setTimeout(() => setNotice(""), 2600);
     return () => window.clearTimeout(timer);
   }, [notice]);
+
+  const navigateTo = (view: ViewName) => {
+    if (view === activeView && !viewLeaving) return;
+    if (viewTimer.current !== undefined) window.clearTimeout(viewTimer.current);
+    setViewLeaving(true);
+    viewTimer.current = window.setTimeout(() => {
+      setActiveView(view);
+      setViewLeaving(false);
+      viewTimer.current = undefined;
+    }, 150);
+  };
 
   const setPreference = <K extends keyof Preferences>(key: K, value: Preferences[K]) => {
     setPreferences((current) => ({ ...current, [key]: value }));
@@ -149,7 +171,7 @@ export default function App() {
     setQuantityOverrides({});
     setCheckedItems({});
     setOffers([]);
-    setActiveView("planner");
+    navigateTo("planner");
     setNotice("Your plan is refreshed around your preferences.");
   };
 
@@ -245,18 +267,22 @@ export default function App() {
   const shoppingUrl = "https://www.google.com/search?tbm=shop&q=" + encodeURIComponent(activeItems.slice(0, 5).map((line) => line.ingredient.name).join(" "));
 
   return (
-    <div className="app-shell">
+    <div className="app-shell" data-theme={theme}>
       <header className="topbar">
-        <button className="brand" type="button" onClick={() => setActiveView("planner")} aria-label="Shopline home">
+        <button className="brand" type="button" onClick={() => navigateTo("planner")} aria-label="Shopline home">
           <span className="brand-mark"><ShoppingBasket size={21} strokeWidth={2.3} /></span>
           <span className="brand-word">shopline<span>.</span></span>
         </button>
         <nav className="main-nav" aria-label="Main navigation">
-          <button className={activeView === "planner" ? "nav-link active" : "nav-link"} onClick={() => setActiveView("planner")} type="button">Meal planner</button>
-          <button className={activeView === "recipes" ? "nav-link active" : "nav-link"} onClick={() => setActiveView("recipes")} type="button">Discover recipes</button>
-          <button className={activeView === "list" ? "nav-link active" : "nav-link"} onClick={() => setActiveView("list")} type="button">Shopping list <span className="nav-count">{activeItems.length}</span></button>
+          <button className={activeView === "planner" ? "nav-link active" : "nav-link"} onClick={() => navigateTo("planner")} type="button"><Sparkles size={14} /> Plan</button>
+          <button className={activeView === "recipes" ? "nav-link active" : "nav-link"} onClick={() => navigateTo("recipes")} type="button"><ChefHat size={14} /> Recipes</button>
+          <button className={activeView === "list" ? "nav-link active" : "nav-link"} onClick={() => navigateTo("list")} type="button"><ShoppingBasket size={14} /> Grocery list <span className="nav-count">{activeItems.length}</span></button>
+          <button className={activeView === "shops" ? "nav-link active" : "nav-link"} onClick={() => navigateTo("shops")} type="button"><MapPinCheck size={14} /> Nearby</button>
         </nav>
         <div className="topbar-actions">
+          <button className="theme-toggle" type="button" onClick={() => setTheme((current) => current === "dark" ? "light" : "dark")} aria-label={"Switch to " + (theme === "dark" ? "light" : "dark") + " theme"} title={theme === "dark" ? "Switch to light theme" : "Switch to dark theme"}>
+            {theme === "dark" ? <Sun size={16} /> : <Moon size={16} />}
+          </button>
           <span className="beta-pill"><span className="status-dot" /> BETA</span>
           <button className="cart-mobile-button" type="button" onClick={() => setMobileCartOpen(true)} aria-label="Open shopping basket">
             <ShoppingCart size={19} /><span>{activeItems.length}</span>
@@ -269,6 +295,7 @@ export default function App() {
       </header>
 
       <main className="page-wrap">
+        {activeView === "planner" && <>
         <section className="welcome-row">
           <div className="welcome-copy">
             <div className="eyebrow"><Sparkles size={14} /> A LITTLE MORE THOUGHTFUL, A LOT LESS SPENT</div>
@@ -372,7 +399,9 @@ export default function App() {
           </div>
         </section>
 
-        <section className="insight-strip" aria-label="Your plan summary">
+        </>}
+
+        {activeView === "planner" && <section className="insight-strip" aria-label="Your plan summary">
           <div className="insight-main">
             <span className="insight-icon"><ShoppingBasket size={19} /></span>
             <span><small>ESTIMATED GROCERY TOTAL</small><strong>{formatCurrency(basketTotal)}</strong></span>
@@ -384,10 +413,12 @@ export default function App() {
           <div className="insight-item"><span className="tiny-insight-icon coin"><Wallet size={17} /></span><span><small>EST. PER MEAL</small><strong>{formatCurrency(currencyPerMeal)}</strong></span></div>
           <div className="insight-divider insight-divider-last" />
           <div className="estimate-mark"><span className="estimate-mark-dot" /><span><strong>Indicative estimates</strong><small>Not store-confirmed</small></span><Info size={14} /></div>
-        </section>
+        </section>}
 
-        <div className="content-grid">
-          <div className="main-column">
+        {activeView !== "planner" && <ViewIntro view={activeView} budget={preferences.budget} zip={preferences.zip} itemCount={activeItems.length} onDownload={downloadList} onDietChange={(diet) => setPreference("diet", diet)} selectedDiet={preferences.diet} />}
+
+        <div className={"content-grid" + (activeView === "list" || activeView === "shops" ? " content-grid-wide" : "")}>
+          <div key={activeView} className={"main-column view-stage " + (viewLeaving ? "view-leaving" : "view-entering")}>
             {activeView === "planner" && (
               <>
                 <div className="section-topline">
@@ -396,7 +427,7 @@ export default function App() {
                     <h2>Your dinner plan <span className="soft-count">{selectedRecipes.length}</span></h2>
                     <p className="section-description">A little variety, a lot less last-minute guessing.</p>
                   </div>
-                  <button className="secondary-button" type="button" onClick={() => setActiveView("recipes")}><Search size={16} /> Explore recipes <ArrowRight size={15} /></button>
+                  <button className="secondary-button" type="button" onClick={() => navigateTo("recipes")}><Search size={16} /> Explore recipes <ArrowRight size={15} /></button>
                 </div>
                 {selectedRecipes.length > 0 ? (
                   <div className="recipe-grid">
@@ -407,7 +438,7 @@ export default function App() {
                       </div>
                     ))}
                     {selectedRecipes.length < preferences.days && (
-                      <button type="button" className="add-day-card" onClick={() => setActiveView("recipes")}>
+                      <button type="button" className="add-day-card" onClick={() => navigateTo("recipes")}>
                         <span className="add-day-icon"><Plus size={22} /></span>
                         <strong>Make room for one more</strong>
                         <span>Browse recipes to fill your plan</span>
@@ -436,7 +467,7 @@ export default function App() {
               <>
                 <div className="section-topline">
                   <div><div className="section-kicker">FRESH IDEAS, NOT MORE WORK <span className="kicker-line" /></div><h2>Discover recipes <span className="soft-count">{eligibleRecipes.length}</span></h2><p className="section-description">Filter by your preference, then add meals to your plan.</p></div>
-                  <button className="secondary-button" type="button" onClick={() => setActiveView("planner")}><ArrowLeft size={15} /> Back to plan</button>
+                  <button className="secondary-button" type="button" onClick={() => navigateTo("planner")}><ArrowLeft size={15} /> Back to plan</button>
                 </div>
                 <div className="recipe-filter-note"><Leaf size={15} /><span>Showing <strong>{DIET_OPTIONS.find((item) => item.value === preferences.diet)?.label.toLowerCase()}</strong> ideas</span><button type="button" onClick={() => setPreference("diet", "all")}>Clear filter <X size={13} /></button></div>
                 <div className="recipe-grid recipe-discovery-grid">
@@ -480,9 +511,36 @@ export default function App() {
                 <ShoppingDestinations mode={preferences.mode} zip={preferences.zip} mapsUrl={mapsUrl} deliveryUrl={deliveryUrl} shoppingUrl={shoppingUrl} />
               </>
             )}
+
+            {activeView === "shops" && (
+              <section className="nearby-page">
+                <div className="nearby-feature">
+                  <div className="nearby-feature-copy">
+                    <span className="section-kicker">YOUR NEIGHBORHOOD, MADE SHOPPABLE <span className="kicker-line" /></span>
+                    <h2>Good finds, closer to home.</h2>
+                    <p>Use ZIP <strong>{preferences.zip}</strong> to explore grocery stores, pickup windows, delivery providers and product searches. Retailers confirm today's prices, stock and fees on their own sites.</p>
+                    <div className="nearby-action-row">
+                      <a className="primary-button" href={mapsUrl} target="_blank" rel="noreferrer"><MapPinCheck size={16} /> Explore nearby stores <ArrowUpRight size={15} /></a>
+                      <a className="secondary-button" href={deliveryUrl} target="_blank" rel="noreferrer"><Truck size={16} /> {preferences.mode === "pickup" ? "Find pickup" : "Explore delivery"}</a>
+                    </div>
+                  </div>
+                  <div className="nearby-feature-visual">
+                    <div className="nearby-glow nearby-glow-one" />
+                    <div className="nearby-glow nearby-glow-two" />
+                    <span className="nearby-map-icon"><MapPinCheck size={25} /></span>
+                    <span className="nearby-map-label">YOUR SEARCH AREA</span>
+                    <strong>{preferences.zip}</strong>
+                    <span className="nearby-map-caption">Stores and options in your area</span>
+                    <a href={mapsUrl} target="_blank" rel="noreferrer" aria-label="Open a map of nearby grocery stores"><ArrowUpRight size={16} /></a>
+                  </div>
+                </div>
+                <ShoppingDestinations mode={preferences.mode} zip={preferences.zip} mapsUrl={mapsUrl} deliveryUrl={deliveryUrl} shoppingUrl={shoppingUrl} />
+                <div className="nearby-note"><Info size={15} /><span>Shopline is a planning companion, not a retailer. The retailer's page is the source of truth for current offers, stock, checkout totals, taxes and delivery fees.</span></div>
+              </section>
+            )}
           </div>
 
-          <aside className={"basket-column" + (mobileCartOpen ? " mobile-cart-open" : "")}>
+          <aside className={"basket-column" + ((activeView === "list" || activeView === "shops" ? " basket-column-hidden" : "") + (mobileCartOpen ? " mobile-cart-open" : ""))}>
             <div className="basket-panel">
               <div className="basket-heading">
                 <div><div className="basket-overline"><span className="basket-pulse" /> YOUR GROCERY LIST</div><h2>The basket <span>{activeItems.length}</span></h2></div>
@@ -497,7 +555,7 @@ export default function App() {
                 <div className={"budget-left-note " + (remainingBudget < 0 ? "negative" : "")}>{remainingBudget >= 0 ? <><CheckCircle2 size={14} /> {formatCurrency(remainingBudget)} left to spend</> : <><Info size={14} /> {formatCurrency(Math.abs(remainingBudget))} above your budget</>}</div>
               </div>
 
-              <div className="basket-list-heading"><span>INGREDIENTS</span><button type="button" onClick={() => setActiveView("list")}>Full list <ArrowRight size={13} /></button></div>
+              <div className="basket-list-heading"><span>INGREDIENTS</span><button type="button" onClick={() => navigateTo("list")}>Full list <ArrowRight size={13} /></button></div>
 
               {basketItems.length > 0 ? (
                 <div className="quick-cart-list">
@@ -533,6 +591,85 @@ export default function App() {
       {mobileCartOpen && <button className="mobile-cart-scrim" type="button" onClick={() => setMobileCartOpen(false)} aria-label="Close shopping basket overlay" />}
       {notice && <div className="toast" role="status"><CheckCircle2 size={17} /><span>{notice}</span><button type="button" onClick={() => setNotice("")} aria-label="Dismiss message"><X size={15} /></button></div>}
     </div>
+  );
+}
+
+function ViewIntro({
+  view,
+  budget,
+  zip,
+  itemCount,
+  onDownload,
+  onDietChange,
+  selectedDiet
+}: {
+  view: ViewName;
+  budget: number;
+  zip: string;
+  itemCount: number;
+  onDownload: () => void;
+  onDietChange: (diet: Diet) => void;
+  selectedDiet: Diet;
+}) {
+  if (view === "recipes") {
+    return (
+      <section className="view-intro recipes-intro">
+        <div className="view-intro-copy">
+          <span className="eyebrow"><Sparkles size={14} /> THE SHOPLINE RECIPE EDIT</span>
+          <h1>Something good<br /><em>is cooking.</em></h1>
+          <p>Recipes with a plan behind them. Pick your mood, add a meal, and let the basket do the math.</p>
+        </div>
+        <div className="view-intro-art recipe-intro-art">
+          <span className="intro-orbit orbit-one" /><span className="intro-orbit orbit-two" />
+          <span className="intro-art-badge"><ChefHat size={15} /> GOOD FOOD, NO GUESSWORK</span>
+          <strong>Find your<br />next favorite.</strong>
+          <span className="intro-art-bottom"><Leaf size={15} /> Thoughtful meals for real life</span>
+        </div>
+        <div className="intro-filters">
+          <span className="field-label"><SlidersHorizontal size={15} /> COOK TO YOUR PREFERENCES</span>
+          <div className="diet-options" role="group" aria-label="Recipe dietary filter">
+            {DIET_OPTIONS.map((option) => (
+              <button type="button" key={option.value} className={selectedDiet === option.value ? "diet-chip selected" : "diet-chip"} onClick={() => onDietChange(option.value)}>
+                <span className="diet-icon">{option.icon}</span>{option.label}
+              </button>
+            ))}
+          </div>
+        </div>
+      </section>
+    );
+  }
+  if (view === "list") {
+    return (
+      <section className="view-intro list-intro">
+        <div className="view-intro-copy">
+          <span className="eyebrow"><ShoppingBasket size={14} /> YOUR LIST, BEAUTIFULLY SORTED</span>
+          <h1>Everything you need.<br /><em>Nothing extra.</em></h1>
+          <p>Your ingredients, grouped and counted. Check things off as you shop and keep an eye on the total.</p>
+        </div>
+        <div className="intro-stat-card">
+          <span className="intro-stat-icon"><ListChecks size={20} /></span>
+          <span className="intro-stat-label">ITEMS ON YOUR LIST</span>
+          <strong>{itemCount}</strong>
+          <span className="intro-stat-foot"><Wallet size={14} /> Budget set to {formatCurrency(budget)}</span>
+          <button className="intro-download-button" type="button" onClick={onDownload}><ArrowDownToLine size={15} /> Download list</button>
+        </div>
+      </section>
+    );
+  }
+  return (
+    <section className="view-intro shops-intro">
+      <div className="view-intro-copy">
+        <span className="eyebrow"><MapPinCheck size={14} /> YOUR NEXT SHOPPING STOP</span>
+        <h1>Closer to home.<br /><em>Better prepared.</em></h1>
+        <p>Explore stores, delivery and pickup options around your ZIP code, then take your organized list with you.</p>
+      </div>
+      <div className="intro-location-card">
+        <span className="intro-location-mark"><MapPinCheck size={21} /></span>
+        <span className="intro-stat-label">YOUR SHOPPING AREA</span>
+        <strong>{zip || "Add ZIP code"}</strong>
+        <span className="intro-location-meta">Local search area · United States</span>
+      </div>
+    </section>
   );
 }
 
