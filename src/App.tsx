@@ -548,7 +548,10 @@ export default function App() {
               <>
                 <div className="section-topline">
                   <div><div className="section-kicker">READY WHEN YOU ARE <span className="kicker-line" /></div><h2>Your shopping list <span className="soft-count">{activeItems.length}</span></h2><p className="section-description">Everything grouped into one list, with package estimates.</p></div>
-                  <button className="secondary-button" type="button" onClick={downloadList}><ArrowDownToLine size={16} /> Download list</button>
+                  <div className="shopping-list-heading-actions">
+                    <button className="clear-list-button" type="button" onClick={() => setClearConfirmOpen(true)} disabled={basketItems.length === 0}><Trash2 size={14}/> Empty basket</button>
+                    <button className="secondary-button" type="button" onClick={downloadList} disabled={basketItems.length === 0}><ArrowDownToLine size={16} /> Download list</button>
+                  </div>
                 </div>
                 <div className="list-summary-card">
                   <div className="list-summary-top"><div><span className="field-label">ESTIMATED CHECKOUT TOTAL</span><strong>{formatCurrency(basketTotal)}</strong></div><div className="list-summary-budget"><span>Budget</span><strong>{formatCurrency(preferences.budget)}</strong></div></div>
@@ -578,7 +581,7 @@ export default function App() {
              {activeView === "shops" && (
               <section className="shopping-results-page">
                 <div className="shopping-results-header">
-                  <div><span className="section-kicker">LOCAL SHOPPING, WITHOUT THE TAB CHAOS <span className="kicker-line"/></span><h2>Find it. Price it. Route it.</h2><p className="section-description">Nearby Kroger locations, current product matches, and all your stops in one workspace.</p></div>
+                  <div><span className="section-kicker">LOCAL SHOPPING, WITHOUT THE TAB CHAOS <span className="kicker-line"/></span><h2>{preferences.mode === "store" ? "Find it. Price it. Route it." : preferences.mode === "pickup" ? "Compare it. Collect it." : "Build your online shop."}</h2><p className="section-description">Nearby Kroger locations, current product matches, and grouped stops in one workspace.</p></div>
                   <button className="secondary-button" type="button" disabled={checkingOffers} onClick={checkLiveOffers}>{checkingOffers ? <><RefreshCw size={14} className="spin-icon"/> Updating…</> : <><RefreshCw size={14}/> Refresh prices</>}</button>
                 </div>
                 <div className="shop-status-strip">
@@ -586,6 +589,13 @@ export default function App() {
                   <span><strong>{preferences.zip || "Location required"}</strong><small>{offerCheckedAt ? "Last checked " + new Date(offerCheckedAt).toLocaleString([], { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }) : "Your ZIP is used only when you search for nearby stores."}</small></span>
                   <span className="shop-status-total"><small>ESTIMATED / MATCHED TOTAL</small><strong>{formatCurrency(basketTotal)}</strong></span>
                 </div>
+
+                {preferences.mode !== "store" && (
+                  <div className="fulfillment-mode-notice">
+                    <span><Truck size={16}/></span>
+                    <div><strong>{preferences.mode === "pickup" ? "Pickup planning mode" : "Delivery planning mode"}</strong><small>Shopline can match products and organize your list, but retailer checkout, pickup-slot availability, delivery coverage and service fees are not connected in this beta. We will not invent those details.</small></div>
+                  </div>
+                )}
 
                 {!liveSearchComplete && (
                   <div className="store-search-empty">
@@ -599,9 +609,13 @@ export default function App() {
 
                 {liveSearchComplete && routeStops.length > 0 && (
                   <>
-                    <Suspense fallback={<div className="route-map-skeleton"><span className="mini-spinner"/> Loading interactive map…</div>}>
-                      <RouteMap stops={routeStops} origin={sharedLocation}/>
-                    </Suspense>
+                    {preferences.mode === "store" ? (
+                      <Suspense fallback={<div className="route-map-skeleton"><span className="mini-spinner"/> Loading interactive map…</div>}>
+                        <RouteMap stops={routeStops} origin={sharedLocation}/>
+                      </Suspense>
+                    ) : (
+                      <div className="fulfillment-stops-note"><MapPinned size={15}/><span>Product matches are grouped by retailer below. A driving route is shown only for in-store shopping.</span></div>
+                    )}
                     <div className="route-stops-section">
                       <div className="route-stops-heading"><div><span className="section-kicker">YOUR STOP-BY-STOP PLAN <span className="kicker-line"/></span><h3>One route, grouped baskets.</h3></div><span>{routeStops.length} {routeStops.length === 1 ? "stop" : "stops"}</span></div>
                       <div className="route-stop-list">

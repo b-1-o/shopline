@@ -12,7 +12,7 @@ type RouteApiResponse = { route?: RouteSummary; error?: string };
 function markerIcon(label: string, origin = false) {
   return L.divIcon({
     className: "shopline-leaflet-marker-shell",
-    html: '<span class="shopline-leaflet-marker' + (origin ? " origin" : "") + '">' + label + "</span>",
+    html: '<span class="shopline-leaflet-marker' + (origin ? " origin" : "") + '"><span>' + label + "</span></span>",
     iconSize: [32, 38],
     iconAnchor: [16, 34],
     popupAnchor: [0, -32]
