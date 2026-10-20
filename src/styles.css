@@ -1067,3 +1067,46 @@ a { color: inherit; text-decoration: none; }
   .view-entering, .view-leaving { animation: none !important; }
   .view-stage { will-change: auto; }
 }
+
+
+/* Keep glass depth without asking the GPU to blur every repeated product card. */
+.app-shell[data-theme="dark"] .recipe-card,
+.app-shell[data-theme="dark"] .destination-card,
+.app-shell[data-theme="dark"] .store-link-card,
+.app-shell[data-theme="dark"] .offers-panel,
+.app-shell[data-theme="dark"] .list-summary-card {
+  backdrop-filter: none;
+}
+.app-shell[data-theme="dark"] .planner-controls,
+.app-shell[data-theme="dark"] .insight-strip,
+.app-shell[data-theme="dark"] .basket-panel,
+.app-shell[data-theme="dark"] .view-intro {
+  backdrop-filter: blur(12px) saturate(112%);
+}
+.view-stage { will-change: auto; }
+.view-entering, .view-leaving { will-change: opacity, transform; }
+.welcome-visual img { transition: transform .55s cubic-bezier(.2,.7,.2,1); }
+.welcome-visual:hover img { transform: scale(1.025); }
+.recipe-grid .planned-meal,
+.recipe-discovery-grid .discovery-recipe-wrap {
+  animation: shopline-card-reveal .34s cubic-bezier(.2,.7,.2,1) both;
+}
+.recipe-grid .planned-meal:nth-child(2),
+.recipe-discovery-grid .discovery-recipe-wrap:nth-child(2) { animation-delay: 35ms; }
+.recipe-grid .planned-meal:nth-child(3),
+.recipe-discovery-grid .discovery-recipe-wrap:nth-child(3) { animation-delay: 70ms; }
+.recipe-grid .planned-meal:nth-child(4),
+.recipe-discovery-grid .discovery-recipe-wrap:nth-child(4) { animation-delay: 105ms; }
+.recipe-grid .planned-meal:nth-child(5),
+.recipe-discovery-grid .discovery-recipe-wrap:nth-child(5) { animation-delay: 140ms; }
+.recipe-grid .planned-meal:nth-child(6),
+.recipe-discovery-grid .discovery-recipe-wrap:nth-child(6) { animation-delay: 175ms; }
+@keyframes shopline-card-reveal {
+  from { opacity: 0; transform: translateY(7px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .recipe-grid .planned-meal,
+  .recipe-discovery-grid .discovery-recipe-wrap,
+  .welcome-visual img { animation: none !important; transition: none !important; }
+}
