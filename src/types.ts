@@ -50,7 +50,7 @@ export interface StorePoint {
 }
 export interface StoreAssignment {
   ingredientId: string; query: string; name: string; brand?: string; price: number; promoPrice?: number | null;
-  size?: string; productId?: string; source: string; store: StorePoint;
+  size?: string; productId?: string; imageUrl?: string; source: string; store: StorePoint;
 }
 export interface StoreStop extends StorePoint { items: string[]; subtotal: number; itemCount: number; }
 export interface RouteSummary { coordinates: Array<[number, number]>; distanceMeters: number; durationSeconds: number; source: string; }

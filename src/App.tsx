@@ -9,7 +9,7 @@ import {
 import { HOUSEHOLD_ITEMS, INGREDIENTS, RECIPES } from "./data";
 import { buildBasket, buildHouseholdQuantities, buildPlan, buildShoppingText, estimateRecipeCost, formatCurrency, matchesAllergies, matchesDiet, optimizeStoreStops } from "./lib/planner";
 import { DEFAULT_PREFERENCES, DEFAULT_QUIZ_ANSWERS, getAnonymousSessionId, readStored, writeStored } from "./lib/storage";
-import type { CartLine, Diet, LiveOffer, Preferences, QuizAnswers, Recipe, ShoppingMode, StoreAssignment, StorePoint, StoreStop, ViewName } from "./types";
+import type { CartLine, Diet, Ingredient, LiveOffer, Preferences, QuizAnswers, Recipe, ShoppingMode, StoreAssignment, StorePoint, StoreStop, ViewName } from "./types";
 import ShoppingQuiz from "./components/ShoppingQuiz";
 
 const RouteMap = lazy(() => import("./components/RouteMap"));
@@ -125,6 +125,7 @@ export default function App() {
   const [liveAssignments, setLiveAssignments] = useState<Record<string, StoreAssignment>>({});
   const [liveSearchComplete, setLiveSearchComplete] = useState(false);
   const [storeLocations, setStoreLocations] = useState<StorePoint[]>([]);
+  const [searchCenter, setSearchCenter] = useState<{ latitude: number; longitude: number } | null>(null);
   const [offerCheckedAt, setOfferCheckedAt] = useState("");
   const [mobileCartOpen, setMobileCartOpen] = useState(false);
   const [clearConfirmOpen, setClearConfirmOpen] = useState(false);
@@ -151,8 +152,8 @@ export default function App() {
   const visibleRecipes = activeView === "recipes" ? eligibleRecipes : selectedRecipes;
   const currencyPerMeal = selectedRecipes.length ? basketTotal / selectedRecipes.length : 0;
   const routeStops = useMemo(
-    () => optimizeStoreStops(basketItems, liveAssignments, sharedLocation),
-    [basketItems, liveAssignments, sharedLocation]
+    () => optimizeStoreStops(basketItems, liveAssignments, sharedLocation || searchCenter),
+    [basketItems, liveAssignments, sharedLocation, searchCenter]
   );
   const unmatchedItems = activeItems.filter((line) => !liveAssignments[line.ingredient.id]);
 
@@ -205,6 +206,8 @@ export default function App() {
       setLiveAssignments({});
       setLiveSearchComplete(false);
       setStoreLocations([]);
+      setSearchCenter(null);
+      setSharedLocation(null);
     }
   };
 
@@ -226,6 +229,7 @@ export default function App() {
     setLiveAssignments({});
     setLiveSearchComplete(false);
     setStoreLocations([]);
+    setSearchCenter(null);
     setOfferCheckedAt("");
     setSharedLocation(coordinates);
     setHouseholdProfile(answers.profileMode === "remember" ? answers : null);
@@ -255,6 +259,7 @@ export default function App() {
     setLiveAssignments({});
     setLiveSearchComplete(false);
     setStoreLocations([]);
+    setSearchCenter(null);
     setOfferCheckedAt("");
   };
 
@@ -313,54 +318,86 @@ export default function App() {
   const checkLiveOffers = async () => {
     if (!/^\d{5}$/.test(preferences.zip.trim())) {
       setQuizOpen(true);
-      setNotice("Add a ZIP code or choose your location before searching nearby stores.");
+      setNotice("Add a ZIP code or share your location before searching nearby stores.");
       return;
     }
-    if (!liveConfigured) {
-      setLiveSearchComplete(false);
-      setStoreLocations([]);
-      setNotice("Kroger price lookup is not connected in this deployment. The list remains available with indicative estimates.");
-      return;
-    }
-
-    const requestedItems = activeItems.map((line) => ({ id: line.ingredient.id, term: line.ingredient.searchTerm || line.ingredient.name }));
+    const requestedItems = activeItems.map((line) => ({
+      id: line.ingredient.id,
+      term: line.ingredient.searchTerm || line.ingredient.name
+    }));
     setCheckingOffers(true);
     setLiveSearchComplete(false);
     setLiveAssignments({});
+    setNotice("");
+
     try {
-      const action = requestedItems.length ? "shop" : "locations";
-      const query = new URLSearchParams({ action, zip: preferences.zip.trim() });
-      if (requestedItems.length) query.set("items", JSON.stringify(requestedItems));
-      const response = await fetch("/api/prices?" + query.toString());
-      const data = await response.json() as {
-        error?: string;
-        message?: string;
-        retrievedAt?: string;
-        assignments?: StoreAssignment[];
-        stores?: StorePoint[];
+      const placesQuery = new URLSearchParams({ zip: preferences.zip.trim() });
+      if (sharedLocation) {
+        placesQuery.set("lat", String(sharedLocation.latitude));
+        placesQuery.set("lon", String(sharedLocation.longitude));
+      }
+      const placesPromise = fetch("/api/places?" + placesQuery.toString())
+        .then(async (response) => {
+          const data = await response.json() as {
+            places?: StorePoint[];
+            center?: { latitude: number; longitude: number } | null;
+            message?: string;
+          };
+          if (!response.ok) throw new Error(data.message || "Nearby store search failed.");
+          return data;
+        })
+        .catch(() => ({ places: [] as StorePoint[], center: null, message: "Nearby stores could not be loaded right now." }));
+
+      type PriceResultData = {
+        error?: string; message?: string; retrievedAt?: string;
+        assignments?: StoreAssignment[]; stores?: StorePoint[];
       };
-      if (!response.ok) throw new Error(data.error || "Live price check failed.");
-      const nextAssignments = Object.fromEntries((data.assignments || []).map((item) => [item.ingredientId, item]));
+      type PriceResult = { ok: boolean; data: PriceResultData } | null;
+      const pricesPromise: Promise<PriceResult> = liveConfigured && requestedItems.length
+        ? (() => {
+            const query = new URLSearchParams({ action: "shop", zip: preferences.zip.trim(), items: JSON.stringify(requestedItems) });
+            return fetch("/api/prices?" + query.toString())
+              .then(async (response) => ({ ok: response.ok, data: await response.json() as PriceResultData }))
+              .catch(() => ({ ok: false, data: { error: "Live prices are temporarily unavailable." } }));
+          })()
+        : Promise.resolve(null);
+
+      const [placesResult, priceResult] = await Promise.all([placesPromise, pricesPromise]);
+      const places = placesResult.places || [];
+      setSearchCenter(placesResult.center || null);
+      const priceData = priceResult?.ok ? priceResult.data : null;
+      const assignments = priceData?.assignments || [];
+      const nextAssignments = Object.fromEntries(assignments.map((item) => [item.ingredientId, item]));
       setLiveAssignments(nextAssignments);
-      setStoreLocations(data.stores || []);
-      setOfferCheckedAt(data.retrievedAt || new Date().toISOString());
+
+      const combinedStores = [...(priceData?.stores || []), ...places];
+      const uniqueStores = Array.from(new Map(combinedStores.map((store) => [store.id, store])).values())
+        .sort((a, b) => (a.distance ?? Number.POSITIVE_INFINITY) - (b.distance ?? Number.POSITIVE_INFINITY));
+      setStoreLocations(uniqueStores);
+      setOfferCheckedAt(priceData?.retrievedAt || new Date().toISOString());
       setLiveSearchComplete(true);
-      if (requestedItems.length) {
+
+      if (requestedItems.length && liveConfigured && priceResult && !priceResult.ok) {
+        setNotice((places.length ? places.length + " nearby stores found. " : "") +
+          (priceResult.data.error || "Live prices could not be loaded; your list and map are still available."));
+      } else if (requestedItems.length && liveConfigured) {
         const matched = Object.keys(nextAssignments).length;
-        setNotice(matched
-          ? (data.message || ("Matched " + matched + " of " + requestedItems.length + " items with current Kroger offers."))
-          : (data.message || "No priced matches found; the list still uses planning estimates."));
+        setNotice((places.length ? places.length + " nearby places found. " : "") +
+          (matched
+            ? (priceData?.message || ("Matched " + matched + " of " + requestedItems.length + " items to current Kroger offers."))
+            : (priceData?.message || "Nearby stores loaded. No live product prices matched; unmatched items keep planning estimates.")));
       } else {
-        setNotice((data.stores?.length || 0) + " nearby Kroger locations found. Add items to compare product prices.");
+        setNotice(places.length
+          ? places.length + " nearby shopping locations found. Location search is separate from live prices."
+          : (placesResult.message || "No nearby shopping locations were returned. Try another ZIP code or share your location."));
       }
     } catch (error) {
-      setNotice(error instanceof Error ? error.message : "Could not check live prices right now.");
+      setNotice(error instanceof Error ? error.message : "Could not search nearby stores right now.");
       setLiveSearchComplete(false);
     } finally {
       setCheckingOffers(false);
     }
   };
-
   const openNearby = () => {
     navigateTo("shops");
     void checkLiveOffers();
@@ -563,14 +600,14 @@ export default function App() {
                     const lines = basketItems.filter((line) => line.ingredient.category === category);
                     return <section className="grocery-category" key={category}>
                       <div className="category-heading"><h3>{category}</h3><span>{lines.length} {lines.length === 1 ? "item" : "items"}</span></div>
-                      {lines.map((line) => <CartRow key={line.ingredient.id} line={line} onToggle={() => toggleChecked(line)} onQuantity={(delta) => changeQuantity(line, delta)} detailed assignment={liveAssignments[line.ingredient.id]} liveChecked={liveSearchComplete} />)}
+                      {lines.map((line) => <CartRow key={line.ingredient.id} line={line} onToggle={() => toggleChecked(line)} onQuantity={(delta) => changeQuantity(line, delta)} detailed assignment={liveAssignments[line.ingredient.id]} liveChecked={liveSearchComplete && liveConfigured} />)}
                     </section>;
                   })}
                   {!basketItems.length && <div className="empty-state"><ShoppingBasket size={25} /><h3>No ingredients yet</h3><p>Add a meal to create your shopping list.</p></div>}
                 </div>
                 <section className="live-prices-card">
                   <div className="live-icon"><Search size={19} /></div>
-                  <div className="live-copy"><h3>{liveConfigured ? "Match products to nearby stores" : "Store matching is not connected"}</h3><p>{liveConfigured ? "Search up to four nearby Kroger stores, compare returned product prices, and assign each item to a store. Unmatched items retain an estimate." : "Live store and price lookup requires a configured Kroger API connection. Your shopping list stays available with indicative estimates."}</p></div>
+                  <div className="live-copy"><h3>{liveConfigured ? "Match products to nearby stores" : "Find nearby stores"}</h3><p>{liveConfigured ? "Search nearby shops, compare current Kroger product prices where available, and group matched items by store." : "Store locations and the interactive map work independently from live prices. Product prices stay labelled as estimates until a retailer returns a match."}</p></div>
                   <button className="secondary-button" type="button" disabled={checkingOffers} onClick={checkLiveOffers}>{checkingOffers ? "Searching…" : "Find stores & prices"} <ArrowRight size={15} /></button>
                 </section>
                 {liveSearchComplete && <div className="matching-summary-strip"><CheckCircle2 size={15}/><span>{Object.keys(liveAssignments).length} of {activeItems.length} items matched to store prices. {unmatchedItems.length ? unmatchedItems.length + " still use estimates." : "All active items have a store match."}</span><button type="button" onClick={openNearby}>View route <ArrowRight size={14}/></button></div>}
@@ -581,7 +618,7 @@ export default function App() {
              {activeView === "shops" && (
               <section className="shopping-results-page">
                 <div className="shopping-results-header">
-                  <div><span className="section-kicker">LOCAL SHOPPING, WITHOUT THE TAB CHAOS <span className="kicker-line"/></span><h2>{preferences.mode === "store" ? "Find it. Price it. Route it." : preferences.mode === "pickup" ? "Compare it. Collect it." : "Build your online shop."}</h2><p className="section-description">Nearby Kroger locations, current product matches, and grouped stops in one workspace.</p></div>
+                  <div><span className="section-kicker">LOCAL SHOPPING, WITHOUT THE TAB CHAOS <span className="kicker-line"/></span><h2>{preferences.mode === "store" ? "Find it. Price it. Route it." : preferences.mode === "pickup" ? "Compare it. Collect it." : "Build your online shop."}</h2><p className="section-description">Nearby shopping locations, current product matches, and grouped stops in one workspace.</p></div>
                   <button className="secondary-button" type="button" disabled={checkingOffers} onClick={checkLiveOffers}>{checkingOffers ? <><RefreshCw size={14} className="spin-icon"/> Updating…</> : <><RefreshCw size={14}/> Refresh prices</>}</button>
                 </div>
                 <div className="shop-status-strip">
@@ -607,16 +644,18 @@ export default function App() {
                   </div>
                 )}
 
-                {liveSearchComplete && routeStops.length > 0 && (
+                {liveSearchComplete && (routeStops.length > 0 || storeLocations.some((store) => typeof store.latitude === "number" && typeof store.longitude === "number")) && (
                   <>
                     {preferences.mode === "store" ? (
                       <Suspense fallback={<div className="route-map-skeleton"><span className="mini-spinner"/> Loading interactive map…</div>}>
-                        <RouteMap stops={routeStops} origin={sharedLocation}/>
+                        <RouteMap stops={routeStops} nearby={storeLocations} origin={sharedLocation || searchCenter} originKind={sharedLocation ? "precise" : searchCenter ? "approximate" : undefined} theme={theme} routeEnabled={preferences.mode === "store"}/>
                       </Suspense>
                     ) : (
-                      <div className="fulfillment-stops-note"><MapPinned size={15}/><span>Product matches are grouped by retailer below. A driving route is shown only for in-store shopping.</span></div>
+                      <Suspense fallback={<div className="route-map-skeleton"><span className="mini-spinner"/> Loading interactive map…</div>}>
+                        <RouteMap stops={routeStops} nearby={storeLocations} origin={sharedLocation || searchCenter} originKind={sharedLocation ? "precise" : searchCenter ? "approximate" : undefined} theme={theme} routeEnabled={false}/>
+                      </Suspense>
                     )}
-                    <div className="route-stops-section">
+                    {routeStops.length > 0 && <div className="route-stops-section">
                       <div className="route-stops-heading"><div><span className="section-kicker">YOUR STOP-BY-STOP PLAN <span className="kicker-line"/></span><h3>One route, grouped baskets.</h3></div><span>{routeStops.length} {routeStops.length === 1 ? "stop" : "stops"}</span></div>
                       <div className="route-stop-list">
                         {routeStops.map((stop, index) => (
@@ -631,15 +670,19 @@ export default function App() {
                         ))}
                       </div>
                       <p className="route-disclaimer"><Info size={14}/> Stops are grouped around matched Kroger products and ordered by a distance-efficient estimate. Store stock, final price, taxes and delivery fees must still be confirmed by the retailer.</p>
-                    </div>
+                    </div>}
                   </>
                 )}
 
-                {liveSearchComplete && unmatchedItems.length > 0 && (
+                {liveSearchComplete && liveConfigured && unmatchedItems.length > 0 && (
                   <section className="unmatched-products">
                     <div><span className="unmatched-icon"><Info size={16}/></span><span><strong>{unmatchedItems.length} items without a live store match</strong><small>Kept in your basket at indicative planning prices; they are not silently removed.</small></span></div>
                     <div className="unmatched-product-list">{unmatchedItems.map((line) => <span key={line.ingredient.id}>{line.ingredient.name}</span>)}</div>
                   </section>
+                )}
+
+                {liveSearchComplete && storeLocations.length === 0 && (
+                  <div className="store-search-empty store-search-empty-compact"><span className="store-search-empty-icon"><MapPinned size={24}/></span><h3>No stores found for this search</h3><p>Try another ZIP code or share your current location. Your list remains available and can still be edited or exported.</p><button className="secondary-button" type="button" onClick={openQuiz}><MapPin size={14}/> Change shopping area</button></div>
                 )}
 
                 {liveSearchComplete && storeLocations.length > 0 && (
@@ -799,6 +842,21 @@ function ViewIntro({
   );
 }
 
+
+const GENERIC_PRODUCT_IMAGE = "https://images.unsplash.com/photo-1540420773420-3366772f4999?auto=format&fit=crop&w=240&q=80";
+
+function productFallbackImage(ingredient: Ingredient): string {
+  const text = (ingredient.kind || "") + " " + ingredient.category + " " + ingredient.name;
+  if (/paper|toilet|towel|tissue|trash bag/i.test(text)) return "https://images.unsplash.com/photo-1583947581924-860bda6a26df?auto=format&fit=crop&w=240&q=80";
+  if (/clean|soap|detergent|sponge|dishwasher|laundry/i.test(text)) return "https://images.unsplash.com/photo-1563453392212-326f5e854473?auto=format&fit=crop&w=240&q=80";
+  if (/personal-care|toothpaste|toothbrush|razor|shampoo|deodorant|body wash|period/i.test(text)) return "https://images.unsplash.com/photo-1608248543803-ba4f8c70ae0b?auto=format&fit=crop&w=240&q=80";
+  if (/baby|pet|diaper|dog|cat|litter/i.test(text)) return "https://images.unsplash.com/photo-1589924691995-400dc9ecc119?auto=format&fit=crop&w=240&q=80";
+  if (/meat|chicken|turkey|beef|pork|fish|seafood/i.test(text)) return "https://images.unsplash.com/photo-1604908176997-125f25cc6f3d?auto=format&fit=crop&w=240&q=80";
+  if (/dairy|milk|cheese|yogurt|egg|feta|butter/i.test(text)) return "https://images.unsplash.com/photo-1563636619-e9143da7973b?auto=format&fit=crop&w=240&q=80";
+  if (/fruit|produce|vegetable|salad|tomato|spinach|cucumber|carrot|broccoli/i.test(text)) return GENERIC_PRODUCT_IMAGE;
+  return "https://images.unsplash.com/photo-1556909114-f6e7ad7d3136?auto=format&fit=crop&w=240&q=80";
+}
+
 function CartRow({
   line,
   onToggle,
@@ -821,6 +879,9 @@ function CartRow({
       <button className="cart-check" type="button" aria-label={(line.checked ? "Uncheck " : "Check ") + line.ingredient.name} onClick={onToggle}>
         {line.checked && <Check size={13} />}
       </button>
+      <div className="cart-product-thumb">
+        <img src={assignment?.imageUrl || productFallbackImage(line.ingredient)} alt="" loading="lazy" onError={(event) => { const image = event.currentTarget; if (image.dataset.fallback !== "true") { image.dataset.fallback = "true"; image.src = GENERIC_PRODUCT_IMAGE; } }} />
+      </div>
       <div className="cart-row-copy">
         <strong>{line.ingredient.name}</strong>
         <span>{line.ingredient.packageLabel}{detailed ? " · needs " + quantityText(line.amountNeeded, line.amountUnit) : ""}</span>
@@ -887,7 +948,7 @@ function ShoppingDestinations({
           <ArrowRight size={16} />
         </button>
         <button type="button" onClick={onCompare} className="destination-card">
-          <span className="destination-icon lavender"><Search size={19} /></span>
+          <span className="destination-icon green"><Search size={19} /></span>
           <span><strong>Compare products</strong><small>Match items to nearby stores</small></span>
           <ArrowRight size={16} />
         </button>

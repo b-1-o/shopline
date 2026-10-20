@@ -12,7 +12,7 @@ type ShoppingItemQuery = { id: string; term: string };
 type StorePoint = { id: string; name: string; address: string; latitude?: number; longitude?: number; distance?: number };
 type Offer = {
   ingredientId: string; query: string; name: string; brand?: string; price: number; promoPrice: number | null;
-  size?: string; productId?: string; source: string; store: StorePoint;
+  size?: string; productId?: string; imageUrl?: string; source: string; store: StorePoint;
 };
 
 function queryValue(value: string | string[] | undefined): string {
@@ -146,7 +146,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse): Promis
       return;
     }
 
-    type ProductPayload = { data?: Array<{ productId?: string; description?: string; brand?: string; items?: Array<{ price?: { regular?: number; promo?: number }; size?: string; itemId?: string }> }> };
+    type ProductPayload = { data?: Array<{ productId?: string; description?: string; brand?: string; images?: Array<{ perspective?: string; sizes?: Array<{ size?: string; url?: string }> }>; items?: Array<{ price?: { regular?: number; promo?: number }; size?: string; itemId?: string }> }> };
     const jobs = stores.flatMap((store) => items.map((item) => ({ store, item })));
     const offers = (await mapLimit(jobs, 5, async ({ store, item }): Promise<Offer | null> => {
       const productUrl = new URL("https://api.kroger.com/v1/products");
@@ -170,6 +170,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse): Promis
           promoPrice: typeof itemRecord.price.promo === "number" && itemRecord.price.promo > 0 ? itemRecord.price.promo : null,
           size: itemRecord.size,
           productId: product.productId || itemRecord.itemId,
+          imageUrl: product.images?.find((image) => image.perspective === "front")?.sizes?.find((image) => image.size === "medium")?.url || product.images?.find((image) => image.perspective === "front")?.sizes?.find((image) => image.size === "small")?.url || product.images?.[0]?.sizes?.find((image) => image.size === "medium")?.url || product.images?.[0]?.sizes?.find((image) => image.size === "small")?.url,
           source: "Kroger",
           store
         };

@@ -281,7 +281,7 @@ export default function ShoppingQuiz({ initial, onClose, onComplete }: Props) {
                 <span className="quiz-label"><MapPin size={15}/> SHOPPING AREA</span>
                 <div className={"quiz-zip-row" + (zipError ? " invalid" : "")}>
                   <MapPinned size={18}/>
-                  <input autoComplete="postal-code" inputMode="numeric" maxLength={5} value={draft.zip} placeholder="Enter 5-digit ZIP code" onChange={(event) => update("zip", event.target.value.replace(/\D/g, "").slice(0, 5))} aria-label="Shopping ZIP code"/>
+                  <input autoComplete="postal-code" inputMode="numeric" maxLength={5} value={draft.zip} placeholder="Enter 5-digit ZIP code" onChange={(event) => { setCoords(null); setLocationMessage(""); update("zip", event.target.value.replace(/\D/g, "").slice(0, 5)); }} aria-label="Shopping ZIP code"/>
                   <button type="button" className="quiz-location-button" onClick={useMyLocation} disabled={locationBusy}>{locationBusy ? <span className="mini-spinner"/> : <MapPin size={14}/>} {locationBusy ? "Finding…" : "Use my location"}</button>
                 </div>
                 {zipError && <p className="quiz-error">{zipError}</p>}
