@@ -10,9 +10,10 @@ describe("Shopline planning", () => {
   });
 
   it("combines ingredients across meals and leaves pantry staples out of the cart", () => {
-    const recipes = RECIPES.filter((recipe) => ["lemon-chicken", "turkey-skillet"].includes(recipe.id));
+    const recipes = RECIPES.filter((recipe) => ["lentil-curry", "turkey-skillet"].includes(recipe.id));
     const lines = buildBasket(recipes, INGREDIENTS, 2);
     expect(lines.filter((line) => line.ingredient.id === "rice")).toHaveLength(1);
+    expect(lines.find((line) => line.ingredient.id === "rice")?.amountNeeded).toBe(12);
     expect(lines.some((line) => line.ingredient.pantry)).toBe(false);
   });
 
