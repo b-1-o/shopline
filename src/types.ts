@@ -1,6 +1,17 @@
 export type Diet = "all" | "vegetarian" | "vegan" | "dairy-free" | "high-protein" | "pescatarian" | "keto";
 export type ShoppingMode = "store" | "pickup" | "delivery";
-export type ViewName = "home" | "wizard" | "plan" | "list" | "budget" | "profile" | "example";
+// Include legacy views used by current App.tsx + new UI views
+export type ViewName =
+  | "home"
+  | "wizard"
+  | "plan"
+  | "list"
+  | "budget"
+  | "profile"
+  | "example"
+  | "planner"
+  | "recipes"
+  | "shops";
 export type ProductGroup = "food" | "paper" | "cleaning" | "personal-care" | "baby-pet";
 export type ProfileMode = "remember" | "ask";
 export type MealType = "breakfast" | "lunch" | "dinner" | "snack";
@@ -41,7 +52,6 @@ export interface QuizAnswers {
   hasKids: boolean;
   hasPets: boolean;
   profileMode: ProfileMode;
-  // New wizard fields
   meals?: MealType[];
   maxCookMinutes?: number;
   excludedProducts?: string[];
@@ -66,7 +76,6 @@ export interface Recipe {
   steps: string[];
   accent: string;
   calories: number;
-  // Optional macros for new UI
   protein?: number;
   fat?: number;
   carbs?: number;
