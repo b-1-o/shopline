@@ -1,0 +1,150 @@
+import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
+import type { CSSProperties } from "react";
+import {
+  ArrowDownToLine, ArrowLeft, ArrowRight, ArrowUpRight, BadgeCheck, Check,
+  CheckCircle2, ChefHat, Clock3, CookingPot, Heart, Info, Leaf, ListChecks, MapPin, MapPinned, Minus, Plus, Search,
+  ShoppingBag, ShoppingBasket, ShoppingCart, SlidersHorizontal, Sparkles,
+  Sprout, Store, Truck, Users, Wallet, X, Moon, Sun, MapPinCheck, Trash2, RefreshCw, ShieldCheck
+} from "lucide-react";
+import { HOUSEHOLD_ITEMS, INGREDIENTS, RECIPES } from "./data";
+import { buildBasket, buildHouseholdQuantities, buildPlan, buildShoppingText, buildStorePlanAssignments, estimateRecipeCost, formatCurrency, matchesAllergies, matchesDiet, optimizeStoreStops } from "./lib/planner";
+import { DEFAULT_PREFERENCES, DEFAULT_QUIZ_ANSWERS, getAnonymousSessionId, readStored, writeStored } from "./lib/storage";
+import type { CartLine, Diet, Ingredient, LiveOffer, Preferences, QuizAnswers, Recipe, ShoppingMode, StoreAssignment, StorePoint, StoreStop, ViewName } from "./types";
+import ShoppingQuiz from "./components/ShoppingQuiz";
+import ProductIcon from "./components/ProductIcon";
+
+const RouteMap = lazy(() => import("./components/RouteMap"));
+const ALL_INGREDIENTS = [...INGREDIENTS, ...HOUSEHOLD_ITEMS];
+
+const DIET_OPTIONS: Array<{ value: Diet; label: string; icon: string }> = [
+  { value: "all", label: "Everything", icon: "✳" },
+  { value: "vegetarian", label: "Vegetarian", icon: "◌" },
+  { value: "vegan", label: "Vegan", icon: "✿" },
+  { value: "dairy-free", label: "Dairy-free", icon: "○" },
+  { value: "high-protein", label: "High protein", icon: "↗" }
+];
+const MODE_OPTIONS: Array<{ value: ShoppingMode; label: string; sub: string }> = [
+  { value: "store", label: "In store", sub: "I'll shop myself" },
+  { value: "pickup", label: "Pickup", sub: "Collect an order" },
+  { value: "delivery", label: "Delivery", sub: "Bring it to me" }
+];
+
+function readInitialPlan(): string[] {
+  const saved = readStored<string[]>("meal-plan", []);
+  return saved.filter((id) => RECIPES.some((recipe) => recipe.id === id));
+}
+
+function readInitialPreferences(): Preferences {
+  const saved = readStored<Preferences>("preferences", DEFAULT_PREFERENCES);
+  return {
+    ...DEFAULT_PREFERENCES,
+    ...saved,
+    // 91605 was the old demo ZIP default, not a user-entered location.
+    zip: saved.zip === "91605" ? "" : (saved.zip || ""),
+    budget: Math.max(25, Math.min(2000, Number(saved.budget) || DEFAULT_PREFERENCES.budget))
+  };
+}
+
+function readInitialQuiz(): QuizAnswers {
+  const savedProfile = readStored<QuizAnswers | null>("household-profile", null);
+  const saved = savedProfile || readStored<QuizAnswers>("last-quiz", DEFAULT_QUIZ_ANSWERS);
+  return {
+    ...DEFAULT_QUIZ_ANSWERS,
+    ...saved,
+    zip: saved.zip === "91605" ? "" : (saved.zip || ""),
+    budget: Math.max(25, Math.min(2000, Number(saved.budget) || DEFAULT_QUIZ_ANSWERS.budget)),
+    groups: saved.groups?.length ? saved.groups : ["food", "paper", "cleaning", "personal-care"],
+    allergies: saved.allergies || [],
+    alreadyHave: saved.alreadyHave || []
+  };
+}
+
+function RecipeCard({
+  recipe,
+  selected,
+  servings,
+  onToggle,
+  onDetails,
+  compact = false
+}: {
+  recipe: Recipe;
+  selected: boolean;
+  servings: number;
+  onToggle: () => void;
+  onDetails: () => void;
+  compact?: boolean;
+}) {
+  const estimated = estimateRecipeCost(recipe, INGREDIENTS, servings);
+  return (
+    <article className={"recipe-card" + (compact ? " recipe-card-compact" : "")}>
+      <button className="recipe-photo" type="button" onClick={onDetails} aria-label={"View " + recipe.title}>
+        <img src={recipe.image} alt={recipe.title} loading="lazy" />
+        <span className={"photo-label " + recipe.accent}>{recipe.tags[0]}</span>
+        <span className="photo-time"><Clock3 size={13} /> {recipe.minutes} min</span>
+        <span className="photo-open"><ArrowUpRight size={16} /></span>
+      </button>
+      <div className="recipe-card-body">
+        <div className="recipe-name-row">
+          <button className="recipe-title-button" type="button" onClick={onDetails}>{recipe.title}</button>
+          <span className="recipe-estimate">{formatCurrency(estimated)}<small> est.</small></span>
+        </div>
+        <p className="recipe-description">{recipe.description}</p>
+        <div className="recipe-card-footer">
+          <span className="recipe-meta"><Users size={14} /> {servings} servings</span>
+          <button className={"add-meal-button" + (selected ? " added" : "")} type="button" onClick={onToggle}>
+            {selected ? <><Check size={15} /> In plan</> : <><Plus size={15} /> Add meal</>}
+          </button>
+        </div>
+      </div>
+    </article>
+  );
+}
+
+function quantityText(amount: number, unit: string): string {
+  const rounded = Math.round(amount * 10) / 10;
+  return String(rounded) + " " + unit;
+}
+
+export default function App() {
+  const [preferences, setPreferences] = useState<Preferences>(readInitialPreferences);
+  const [selectedIds, setSelectedIds] = useState<string[]>(readInitialPlan);
+  const [quantityOverrides, setQuantityOverrides] = useState<Record<string, number>>(() => readStored("quantities", {}));
+  const [checkedItems, setCheckedItems] = useState<Record<string, boolean>>(() => readStored("checked", {}));
+  const [extraQuantities, setExtraQuantities] = useState<Record<string, number>>(() => readStored("extra-quantities", {}));
+  const [householdProfile, setHouseholdProfile] = useState<QuizAnswers | null>(() => readStored<QuizAnswers | null>("household-profile", null));
+  const [quizAnswers, setQuizAnswers] = useState<QuizAnswers>(readInitialQuiz);
+  const [quizOpen, setQuizOpen] = useState(() => readStored<QuizAnswers | null>("household-profile", null) === null);
+  const [sharedLocation, setSharedLocation] = useState<{ latitude: number; longitude: number } | null>(null);
+  const [activeView, setActiveView] = useState<ViewName>("planner");
+  const [theme, setTheme] = useState<"dark" | "light">(() => readStored<"dark" | "light">("theme", "dark"));
+  const [viewLeaving, setViewLeaving] = useState(false);
+  const viewTimer = useRef<number | undefined>(undefined);
+  const [detailRecipe, setDetailRecipe] = useState<Recipe | null>(null);
+  const [notice, setNotice] = useState("");
+  const [liveConfigured, setLiveConfigured] = useState(false);
+  const [checkingOffers, setCheckingOffers] = useState(false);
+  const [liveAssignments, setLiveAssignments] = useState<Record<string, StoreAssignment>>({});
+  const [liveSearchComplete, setLiveSearchComplete] = useState(false);
+  const [storeLocations, setStoreLocations] = useState<StorePoint[]>([]);
+  const [searchCenter, setSearchCenter] = useState<{ latitude: number; longitude: number } | null>(null);
+  const [offerCheckedAt, setOfferCheckedAt] = useState("");
+  const [mobileCartOpen, setMobileCartOpen] = useState(false);
+  const [clearConfirmOpen, setClearConfirmOpen] = useState(false);
+  const anonymousSessionId = useMemo(() => getAnonymousSessionId(), []);
+
+  const selectedRecipes = useMemo(
+    () => selectedIds.map((id) => RECIPES.find((recipe) => recipe.id === id)).filter((recipe): recipe is Recipe => Boolean(recipe)),
+    [selectedIds]
+  );
+  const basketItems = useMemo(
+    () => buildBasket(selectedRecipes, ALL_INGREDIENTS, preferences.servings, quantityOverrides, checkedItems, extraQuantities),
+    [selectedIds, preferences.servings, quantityOverrides, checkedItems, extraQuantities]
+  );
+  const activeItems = basketItems.filter((item) => item.quantity > 0);
+  const basketTotal = basketItems.reduce((sum, item) => {
+    const assignment = liveAssignments[item.ingredient.id];
+    const unitPrice = assignment ? (assignment.promoPrice && assignment.promoPrice > 0 ? assignment.promoPrice : assignment.price) : item.ingredient.price;
+    return sum + item.quantity * unitPrice;
+  }, 0);
+  const checkedCount = basketItems.filter((item) => item.checked).length;
+  const remainingBudget = preferences.budget - basketTotal;
