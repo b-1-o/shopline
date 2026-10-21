@@ -1,3 +1,27 @@
-/* Styles temporarily served from historical commit via index.html link
-   (cdn.jsdelivr.net/gh/b-1-o/shopline@bafcb236.../src/styles.css)
-   so the full UI is restored without a broken partial stylesheet. */
+/* Local overrides on top of the historical full stylesheet linked in index.html */
+
+.app-shell .cart-product-thumb {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.app-shell .cart-product-thumb img {
+  width: 100%;
+  height: 100%;
+  display: block;
+  object-fit: cover;
+}
+
+.app-shell .cart-product-icon {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.app-shell .cart-product-icon svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
