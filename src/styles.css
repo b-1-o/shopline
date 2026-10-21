@@ -1,61 +1,8 @@
-@import "./styles/tokens.css";
-
-/* Temporary bridge: keep tokens available while full design-system CSS is finalized.
-   Legacy App.tsx class names still rely on rules below from the previous stylesheet. */
-
-:root {
-  font-family: "DM Sans", sans-serif;
-  color: #25352d;
-  background: #f7f7f1;
-  --ink: #26372e;
-  --muted: #818980;
-  --line: #e7e9df;
-  --green: #2f6349;
-  --green-dark: #234a37;
-  --green-soft: #e7f0e7;
-  --paper: #fffefa;
-  --cream: #f7f7f1;
-  --orange: #de8758;
-  --serif: "Manrope", sans-serif;
-}
-
-* { box-sizing: border-box; }
-html { min-width: 320px; }
-body { margin: 0; min-height: 100vh; background: var(--cream); color: var(--ink); }
-button, input { font: inherit; }
-button { cursor: pointer; }
-button:disabled { cursor: not-allowed; opacity: 0.4; }
-a { color: inherit; text-decoration: none; }
-
-.app-shell { min-height: 100vh; }
-.topbar {
-  height: 72px; max-width: 1200px; margin: 0 auto; padding: 0 24px;
-  display: flex; align-items: center; gap: 24px; border-bottom: 1px solid var(--line);
-}
-.brand { display: inline-flex; align-items: center; gap: 10px; border: 0; background: transparent; color: var(--ink); }
-.brand-mark {
-  width: 34px; height: 34px; border-radius: 12px; background: var(--green); color: #fff;
-  display: inline-flex; align-items: center; justify-content: center;
-}
-.brand-word { font-family: var(--serif); font-weight: 800; font-size: 20px; }
-.main-nav { display: flex; gap: 20px; flex: 1; }
-.nav-link {
-  border: 0; background: transparent; color: var(--muted); font-weight: 600; font-size: 13px;
-}
-.nav-link.active { color: var(--green-dark); }
-.page-wrap { max-width: 1200px; margin: 0 auto; padding: 24px; }
-.secondary-button, .text-button, .add-meal-button {
-  border: 1px solid var(--line); background: var(--paper); border-radius: 10px;
-  padding: 10px 14px; font-weight: 700; color: var(--green-dark);
-}
-.add-meal-button.added { background: var(--green-soft); }
-.recipe-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 16px; }
-.recipe-card { border: 1px solid var(--line); border-radius: 14px; background: var(--paper); overflow: hidden; }
-.recipe-photo { display: block; width: 100%; height: 150px; border: 0; padding: 0; position: relative; }
-.recipe-photo img { width: 100%; height: 100%; object-fit: cover; }
-.recipe-card-body { padding: 14px; }
-.recipe-title-button { border: 0; background: transparent; font-weight: 700; text-align: left; }
-.notice {
-  position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
-  background: var(--ink); color: #fff; padding: 12px 16px; border-radius: 12px; z-index: 50;
-}
+@import "./styles/c1.css";
+@import "./styles/c2.css";
+@import "./styles/c3.css";
+@import "./styles/c4.css";
+@import "./styles/c5.css";
+@import "./styles/c6.css";
+@import "./styles/c7.css";
+@import "./styles/c8.css";
