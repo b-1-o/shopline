@@ -1,8 +1,3 @@
-@import "./styles/c1.css";
-@import "./styles/c2.css";
-@import "./styles/c3.css";
-@import "./styles/c4.css";
-@import "./styles/c5.css";
-@import "./styles/c6.css";
-@import "./styles/c7.css";
-@import "./styles/c8.css";
+/* Styles temporarily served from historical commit via index.html link
+   (cdn.jsdelivr.net/gh/b-1-o/shopline@bafcb236.../src/styles.css)
+   so the full UI is restored without a broken partial stylesheet. */
