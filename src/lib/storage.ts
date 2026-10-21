@@ -1,6 +1,6 @@
-import type { Preferences, QuizAnswers } from "../types";
+import type { Preferences, QuizAnswers, PlanState } from "../types";
 
-const PREFIX = "shopline.beta.";
+const PREFIX = "shopline.v2.";
 
 export function readStored<T>(key: string, fallback: T): T {
   try {
@@ -24,9 +24,10 @@ export function getAnonymousSessionId(): string {
   try {
     const current = localStorage.getItem(key);
     if (current) return current;
-    const created = typeof crypto !== "undefined" && "randomUUID" in crypto
-      ? crypto.randomUUID()
-      : "anon-" + Math.random().toString(36).slice(2) + Date.now().toString(36);
+    const created =
+      typeof crypto !== "undefined" && "randomUUID" in crypto
+        ? crypto.randomUUID()
+        : "anon-" + Math.random().toString(36).slice(2) + Date.now().toString(36);
     localStorage.setItem(key, created);
     return created;
   } catch {
@@ -36,24 +37,37 @@ export function getAnonymousSessionId(): string {
 
 export const DEFAULT_PREFERENCES: Preferences = {
   zip: "",
-  budget: 350,
-  days: 7,
+  budget: 100,
+  days: 5,
   servings: 2,
   diet: "all",
-  mode: "store"
+  mode: "store",
 };
 
 export const DEFAULT_QUIZ_ANSWERS: QuizAnswers = {
   zip: "",
-  budget: 350,
-  days: 7,
+  budget: 100,
+  days: 5,
   servings: 2,
   diet: "all",
   mode: "store",
-  groups: ["food", "paper", "cleaning", "personal-care"],
+  groups: ["food"],
   allergies: [],
   alreadyHave: [],
   hasKids: false,
   hasPets: false,
-  profileMode: "ask"
+  profileMode: "ask",
+  meals: ["breakfast", "lunch", "dinner"],
+  maxCookMinutes: 45,
+  excludedProducts: [],
 };
+
+export function savePlanHistory(plan: PlanState) {
+  const history = readStored<PlanState[]>("plan-history", []);
+  const next = [plan, ...history.filter((p) => p.createdAt !== plan.createdAt)].slice(0, 10);
+  writeStored("plan-history", next);
+}
+
+export function getPlanHistory(): PlanState[] {
+  return readStored<PlanState[]>("plan-history", []);
+}
