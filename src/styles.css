@@ -268,3 +268,609 @@
 .app-shell .page-wrap > section {
   animation: shopline-fade-up 0.4s ease both;
 }
+
+
+/* ── Shopline usability refresh ─────────────────────────────────────────── */
+.app-shell .page-wrap {
+  max-width: 1520px;
+  padding-inline: clamp(18px, 3.2vw, 52px);
+}
+.app-shell .topbar {
+  min-height: 72px;
+  padding-inline: clamp(18px, 3.2vw, 52px);
+}
+.app-shell .brand-mark {
+  width: 42px;
+  height: 42px;
+  border-radius: 14px;
+}
+.app-shell .brand-word {
+  font-size: 20px;
+  letter-spacing: -0.75px;
+}
+.app-shell .main-nav {
+  gap: 6px;
+}
+.app-shell .nav-link {
+  min-height: 40px;
+  padding: 10px 14px;
+  border-radius: 12px;
+  font-size: 12px;
+}
+.app-shell .anonymous-chip,
+.app-shell .beta-pill {
+  font-size: 10px;
+}
+.app-shell .welcome-row {
+  min-height: 330px;
+  gap: clamp(28px, 4vw, 60px);
+  padding-block: 40px 32px;
+}
+.app-shell .welcome-copy h1 {
+  font-size: clamp(42px, 4.1vw, 60px);
+  line-height: 1.04;
+  letter-spacing: -2.6px;
+}
+.app-shell .welcome-copy p {
+  max-width: 520px;
+  font-size: 15px;
+  line-height: 1.75;
+}
+.app-shell .welcome-visual {
+  min-height: 320px;
+  border-radius: 24px;
+}
+.app-shell .household-summary-card {
+  border-radius: 20px;
+  padding: 24px;
+}
+.app-shell .household-summary-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.app-shell .section-kicker,
+.app-shell .eyebrow {
+  font-size: 10px;
+  letter-spacing: 1.2px;
+}
+.app-shell .section-topline {
+  margin-bottom: 22px;
+}
+.app-shell .section-topline h2,
+.app-shell .shopping-results-header h2 {
+  font-size: clamp(25px, 2.3vw, 32px);
+  line-height: 1.14;
+  letter-spacing: -0.8px;
+}
+.app-shell .section-description {
+  font-size: 12px;
+  line-height: 1.7;
+}
+.app-shell .content-grid {
+  grid-template-columns: minmax(0, 1fr) 350px;
+  gap: 32px;
+}
+.app-shell .content-grid.content-grid-wide {
+  grid-template-columns: minmax(0, 1fr);
+}
+.app-shell .basket-panel {
+  border-radius: 20px;
+  padding: 20px;
+}
+.app-shell .basket-heading h2 {
+  font-size: 20px;
+}
+.app-shell .recipe-grid.recipe-discovery-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 20px;
+}
+.app-shell .discovery-recipe-wrap {
+  min-width: 0;
+}
+.app-shell .recipe-card {
+  border-radius: 16px;
+}
+.app-shell .recipe-photo {
+  height: 188px;
+}
+.app-shell .recipe-card-body {
+  padding: 16px;
+}
+.app-shell .recipe-title-button {
+  font-size: 14px;
+  line-height: 1.35;
+}
+.app-shell .recipe-description {
+  font-size: 12px;
+  line-height: 1.6;
+  min-height: 38px;
+}
+.app-shell .recipe-meta {
+  font-size: 10px;
+}
+.app-shell .recipe-estimate {
+  font-size: 12px;
+}
+.app-shell .add-meal-button {
+  min-height: 36px;
+  padding: 8px 11px;
+  border-radius: 10px;
+  font-size: 11px;
+}
+.app-shell .secondary-button,
+.app-shell .primary-button,
+.app-shell .clear-list-button {
+  min-height: 42px;
+  padding: 11px 15px;
+  border-radius: 11px;
+  font-size: 11px;
+}
+.app-shell .quick-list-button {
+  background: #f0d77b !important;
+  border-color: #e0c35d !important;
+  color: #273328 !important;
+  box-shadow: 0 6px 16px rgba(168, 133, 43, 0.13);
+}
+.app-shell .quick-list-button:hover {
+  background: #f6df8b !important;
+  transform: translateY(-1px);
+}
+.app-shell .shopping-results-header {
+  align-items: center;
+  margin-bottom: 15px;
+}
+.app-shell .shopping-results-header .section-description {
+  font-size: 12px;
+}
+.app-shell .shop-status-strip {
+  padding: 16px 18px;
+  border-radius: 14px;
+}
+.app-shell .shop-status-strip > span:nth-child(2) strong {
+  font-size: 13px;
+}
+.app-shell .shop-status-strip > span:nth-child(2) small {
+  font-size: 11px;
+  line-height: 1.45;
+}
+.app-shell .store-search-empty {
+  padding: 40px 26px;
+  gap: 13px;
+  border-radius: 18px;
+}
+.app-shell .store-search-empty h3 {
+  font-size: 22px;
+}
+.app-shell .store-search-empty p {
+  font-size: 12px;
+}
+.app-shell .store-search-empty .primary-button {
+  margin-top: 5px;
+}
+.app-shell .store-address-panel {
+  margin: 18px 0 24px;
+  padding: 22px;
+  border: 1px solid #e2e7d9;
+  border-radius: 18px;
+  background: #fffef9;
+  box-shadow: 0 8px 24px rgba(47, 57, 39, 0.045);
+}
+.app-shell .store-address-panel-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  margin-bottom: 18px;
+}
+.app-shell .store-address-panel-icon {
+  display: flex;
+  flex: 0 0 44px;
+  width: 44px;
+  height: 44px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 14px;
+  background: #edf3e6;
+  color: #54794a;
+}
+.app-shell .store-address-panel-head h3 {
+  margin: 7px 0 6px;
+  color: #344735;
+  font-family: var(--serif);
+  font-size: 22px;
+  line-height: 1.2;
+  letter-spacing: -0.4px;
+}
+.app-shell .store-address-panel-head p {
+  max-width: 650px;
+  margin: 0;
+  color: #80897d;
+  font-size: 12px;
+  line-height: 1.6;
+}
+.app-shell .store-address-quicklist {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+.app-shell .store-address-quickitem {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  min-width: 0;
+  min-height: 112px;
+  padding: 14px;
+  border: 1px solid #e3e8dc;
+  border-radius: 14px;
+  background: #fff;
+  color: inherit;
+  text-decoration: none;
+  transition: transform .18s ease, border-color .18s ease, box-shadow .18s ease;
+}
+.app-shell .store-address-quickitem:hover {
+  transform: translateY(-2px);
+  border-color: #bdcfb1;
+  box-shadow: 0 9px 20px rgba(47, 65, 43, 0.08);
+}
+.app-shell .store-address-order {
+  display: inline-flex;
+  flex: 0 0 30px;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 10px;
+  background: #edf3e6;
+  color: #587950;
+  font-size: 10px;
+  font-weight: 800;
+}
+.app-shell .store-address-text {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+.app-shell .store-address-text strong {
+  color: #384b38;
+  font-size: 12px;
+  line-height: 1.35;
+}
+.app-shell .store-address-text small {
+  overflow-wrap: anywhere;
+  color: #818b7c;
+  font-size: 11px;
+  line-height: 1.5;
+}
+.app-shell .store-address-directions,
+.app-shell .store-directions-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  width: fit-content;
+  color: #527448;
+  font-size: 10px;
+  font-weight: 800;
+  text-decoration: none;
+}
+.app-shell .store-address-directions {
+  flex: 0 0 auto;
+  align-self: flex-end;
+  white-space: nowrap;
+}
+.app-shell .store-directions-link {
+  margin-top: 7px;
+  padding: 4px 0;
+}
+.app-shell .store-directions-link:hover,
+.app-shell .store-address-directions:hover {
+  color: #8a7027;
+  text-decoration: underline;
+}
+.app-shell .route-stop-list {
+  gap: 14px;
+}
+.app-shell .route-stop-card {
+  border-radius: 16px;
+  padding: 18px;
+}
+.app-shell .route-stop-number {
+  width: 38px;
+  height: 38px;
+  border-radius: 12px;
+  font-size: 12px;
+}
+.app-shell .route-stop-title h4 {
+  font-size: 14px;
+}
+.app-shell .route-stop-title p {
+  font-size: 11px;
+  line-height: 1.5;
+}
+.app-shell .route-stop-title > strong {
+  font-size: 14px;
+}
+.app-shell .route-stop-foot {
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  font-size: 10px;
+}
+.app-shell .route-disclaimer {
+  font-size: 11px;
+  line-height: 1.65;
+}
+.app-shell .nearby-location-list {
+  margin-top: 24px;
+}
+.app-shell .nearby-location-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+.app-shell .nearby-location-card {
+  align-items: flex-start;
+  gap: 12px;
+  padding: 14px;
+  border-radius: 14px;
+}
+.app-shell .nearby-location-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: 11px;
+}
+.app-shell .nearby-location-card > span:nth-child(2) {
+  gap: 6px;
+}
+.app-shell .nearby-location-card strong {
+  font-size: 12px;
+  line-height: 1.4;
+}
+.app-shell .nearby-location-card small {
+  overflow-wrap: anywhere;
+  font-size: 11px;
+  line-height: 1.5;
+}
+.app-shell .location-status {
+  padding: 5px 7px;
+  border-radius: 8px;
+  font-size: 9px;
+}
+.app-shell .recipe-search-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin: 0 0 20px;
+}
+.app-shell .recipe-search-field {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  flex: 1;
+  min-width: 0;
+  min-height: 50px;
+  padding: 0 15px;
+  border: 1px solid #e0e6d9;
+  border-radius: 14px;
+  background: #fffef9;
+  color: #788674;
+  box-shadow: 0 4px 14px rgba(47, 57, 39, 0.035);
+}
+.app-shell .recipe-search-field:focus-within {
+  border-color: #a8c198;
+  box-shadow: 0 0 0 3px rgba(120, 158, 100, 0.13);
+}
+.app-shell .recipe-search-field input {
+  width: 100%;
+  min-width: 0;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: #314333;
+  font: inherit;
+  font-size: 13px;
+}
+.app-shell .recipe-search-field input::placeholder {
+  color: #9aa396;
+}
+.app-shell .recipe-search-field button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 30px;
+  width: 30px;
+  height: 30px;
+  border: 0;
+  border-radius: 9px;
+  background: #edf1e9;
+  color: #66775f;
+}
+.app-shell .recipe-result-count {
+  flex: 0 0 auto;
+  color: #849080;
+  font-size: 11px;
+  white-space: nowrap;
+}
+.app-shell .recipe-result-count strong {
+  color: #425b3e;
+  font-size: 14px;
+}
+.app-shell .recipe-empty-state {
+  border: 1px dashed #d6dfcd;
+  border-radius: 16px;
+  padding: 34px 22px;
+}
+.app-shell[data-theme="dark"] .store-address-panel {
+  border-color: rgba(255, 255, 255, 0.09);
+  background: linear-gradient(145deg, rgba(31, 42, 32, 0.95), rgba(24, 32, 25, 0.98));
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.13);
+}
+.app-shell[data-theme="dark"] .store-address-panel-head h3 {
+  color: #edf3e6;
+}
+.app-shell[data-theme="dark"] .store-address-panel-head p {
+  color: #a0ad9b;
+}
+.app-shell[data-theme="dark"] .store-address-panel-icon,
+.app-shell[data-theme="dark"] .store-address-order {
+  background: rgba(173, 203, 144, 0.12);
+  color: #cde2b8;
+}
+.app-shell[data-theme="dark"] .store-address-quickitem {
+  border-color: rgba(255, 255, 255, 0.09);
+  background: rgba(255, 255, 255, 0.035);
+}
+.app-shell[data-theme="dark"] .store-address-text strong {
+  color: #e9efe2;
+}
+.app-shell[data-theme="dark"] .store-address-text small {
+  color: #a1ad9c;
+}
+.app-shell[data-theme="dark"] .store-address-directions,
+.app-shell[data-theme="dark"] .store-directions-link {
+  color: #c6dea9;
+}
+.app-shell[data-theme="dark"] .recipe-search-field {
+  border-color: rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.035);
+  color: #b8c3b0;
+}
+.app-shell[data-theme="dark"] .recipe-search-field input {
+  color: #edf3e6;
+}
+.app-shell[data-theme="dark"] .recipe-search-field button {
+  background: rgba(255, 255, 255, 0.08);
+  color: #cbd7c4;
+}
+.app-shell[data-theme="dark"] .recipe-result-count {
+  color: #9da997;
+}
+.app-shell[data-theme="dark"] .recipe-result-count strong {
+  color: #dce9cf;
+}
+@media (max-width: 1240px) {
+  .app-shell .content-grid {
+    grid-template-columns: minmax(0, 1fr) 320px;
+    gap: 24px;
+  }
+  .app-shell .recipe-grid.recipe-discovery-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .app-shell .store-address-quicklist {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@media (max-width: 980px) {
+  .app-shell .content-grid,
+  .app-shell .content-grid.content-grid-wide {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .app-shell .basket-column {
+    display: none;
+  }
+  .app-shell .basket-column.mobile-cart-open {
+    display: block;
+  }
+  .app-shell .recipe-grid.recipe-discovery-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .app-shell .store-address-quicklist {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+@media (max-width: 680px) {
+  .app-shell .page-wrap {
+    padding-inline: 16px;
+  }
+  .app-shell .topbar {
+    min-height: 62px;
+    padding-inline: 14px;
+  }
+  .app-shell .brand-mark {
+    width: 36px;
+    height: 36px;
+  }
+  .app-shell .brand-word {
+    font-size: 18px;
+  }
+  .app-shell .main-nav {
+    gap: 2px;
+  }
+  .app-shell .nav-link {
+    padding: 8px 9px;
+    min-height: 36px;
+    font-size: 10px;
+  }
+  .app-shell .anonymous-chip,
+  .app-shell .beta-pill {
+    display: none;
+  }
+  .app-shell .welcome-row {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 20px;
+    padding-block: 28px 22px;
+  }
+  .app-shell .welcome-copy h1 {
+    font-size: clamp(38px, 11vw, 50px);
+  }
+  .app-shell .welcome-visual {
+    min-height: 230px;
+  }
+  .app-shell .household-summary-card {
+    padding: 17px;
+  }
+  .app-shell .household-summary-actions {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .app-shell .section-topline {
+    align-items: flex-start;
+  }
+  .app-shell .section-topline h2,
+  .app-shell .shopping-results-header h2 {
+    font-size: 24px;
+  }
+  .app-shell .recipe-grid.recipe-discovery-grid {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 15px;
+  }
+  .app-shell .recipe-photo {
+    height: 205px;
+  }
+  .app-shell .recipe-search-row {
+    align-items: stretch;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .app-shell .recipe-result-count {
+    align-self: flex-end;
+  }
+  .app-shell .store-address-panel {
+    padding: 15px;
+  }
+  .app-shell .store-address-panel-head h3 {
+    font-size: 19px;
+  }
+  .app-shell .nearby-location-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .app-shell .nearby-location-card {
+    flex-wrap: wrap;
+  }
+  .app-shell .shopping-results-header {
+    align-items: flex-start;
+  }
+  .app-shell .shopping-results-header > button {
+    min-width: 0;
+    padding: 9px 10px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .app-shell *,
+  .app-shell *::before,
+  .app-shell *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+  }
+}
