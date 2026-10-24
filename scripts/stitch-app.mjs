@@ -88,5 +88,7 @@ replaceRequired("<span>{householdProfile ? \"Household saved\" : \"Guest planner
 replaceRequired("<button className=\"secondary-button quick-list-button\" type=\"button\" onClick={() => applyQuizAnswers(quizAnswers, sharedLocation)}><CheckCircle2 size={15}/> Quick list · use current settings</button>", "<button className=\"secondary-button quick-list-button\" type=\"button\" disabled={Boolean(auth?.isAuthenticated && !preferenceSyncReady)} onClick={() => applyQuizAnswers(quizAnswers, sharedLocation)}><CheckCircle2 size={15}/> {auth?.isAuthenticated && !preferenceSyncReady ? \"Loading your settings…\" : \"Quick list · use current settings\"}</button>", "Wait for saved settings before Quick list");
 
 
+replaceRequired('          <div className="anonymous-chip" title="No account needed">', '          {auth?.error && <div className="auth-error-banner" role="alert"><strong>Authentication failed:</strong> {auth.error.message}</div>}\\n          <div className="anonymous-chip" title="No account needed">', "show Auth0 callback errors");
+
 writeFileSync(join(root, "src/AppFull.tsx"), text);
 console.log("restored AppFull.tsx", text.length, "bytes (full shops/routes/location + SVG icons)");
