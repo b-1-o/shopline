@@ -21,31 +21,6 @@ Shopline is a responsive, no-account grocery-planning beta built with React, Typ
 - Server-side Kroger API adapter for live product-price lookups once valid credentials are configured.
 - An anonymous-session boundary and profile types are prepared for a future account implementation; there is no registration or login UI in this beta.
 
-## Auth0 accounts and saved Quick list preferences
-
-Shopline uses Auth0 Universal Login for account creation and sign-in. Signed-in preferences are saved to Auth0 `user_metadata.shoplineSettings` and loaded on the next visit or another device. This stores planning settings, not passwords or access tokens: ZIP code, budget, number of days, servings, diet, shopping mode, household shopping categories, allergy filters, items already at home, and optional household flags. The guest planner remains available when Auth0 is not configured.
-
-### Configure Auth0
-
-1. In **Applications → Applications**, create a **Single Page Application** for Shopline. Add `https://shopline-bice.vercel.app` and `http://localhost:5173` to Allowed Callback URLs, Allowed Logout URLs, and Allowed Web Origins.
-2. In **Applications → APIs**, create an API with identifier `https://shopline-api`. Use this same identifier for the audience environment variables below.
-3. Create a separate **Machine to Machine** application for the server-side preference adapter. Authorize it for the **Auth0 Management API** with `read:users` and `update:users`. Its client secret is only for the Vercel server function; never put it in a `VITE_` variable or frontend code.
-4. In Vercel → **Project Settings → Environment Variables**, set the following values for the environments you deploy:
-
-| Variable | Value |
-| --- | --- |
-| `VITE_AUTH0_DOMAIN` | Auth0 tenant domain, such as `your-tenant.us.auth0.com` |
-| `VITE_AUTH0_CLIENT_ID` | Client ID of the Shopline Single Page Application |
-| `VITE_AUTH0_AUDIENCE` | `https://shopline-api` |
-| `AUTH0_DOMAIN` | Same tenant domain, without `https://` |
-| `AUTH0_AUDIENCE` | `https://shopline-api` |
-| `AUTH0_MANAGEMENT_CLIENT_ID` | Client ID of the Management API Machine to Machine application |
-| `AUTH0_MANAGEMENT_CLIENT_SECRET` | Secret of that Machine to Machine application |
-
-5. Redeploy Shopline after adding the Vercel variables. For local development, put the values in your own untracked `.env.local` file based on `.env.example`; do not commit real credentials.
-
-The `/api/preferences` route verifies each Auth0 access token against the tenant's JWKS and expected API audience before reading or updating only the signed-in user's metadata. Auth0 Management API credentials stay server-side. When settings are available, **Quick list · use current settings** waits for them to load, then builds the plan from those preferences. New accounts get a first-use preference record from their current settings.
-
 ## Price transparency
 
 The included sample catalog contains **indicative planning estimates**, not live quotes. Retail prices, package size, promotions, delivery fees, taxes and stock vary by retailer and store. The app does not label the fallback catalog as live or guaranteed.
