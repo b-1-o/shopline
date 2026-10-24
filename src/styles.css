@@ -985,3 +985,33 @@
     font-size: 9px;
   }
 }
+
+
+/* Make Auth0 callback failures visible rather than silently returning to guest mode. */
+.app-shell .auth-error-banner {
+  max-width: 320px;
+  padding: 8px 10px;
+  border: 1px solid #d99191;
+  border-radius: 10px;
+  background: #fff0ef;
+  color: #852c2c;
+  font-size: 11px;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+.app-shell .auth-error-banner strong {
+  display: block;
+  margin-bottom: 2px;
+  font-weight: 800;
+}
+.app-shell[data-theme="dark"] .auth-error-banner {
+  border-color: #874d4d;
+  background: rgba(135, 42, 42, .2);
+  color: #ffc6c1;
+}
+@media (max-width: 680px) {
+  .app-shell .auth-error-banner {
+    max-width: min(68vw, 270px);
+    font-size: 10px;
+  }
+}
