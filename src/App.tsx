@@ -1,1 +1,1 @@
-export { default } from "./AppFull";
+export { default, AuthenticatedShopline } from "./AppFull";
