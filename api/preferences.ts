@@ -101,7 +101,7 @@ function normalizeSettings(value: unknown): SettingsRecord | null {
     maxCookMinutes: boundedNumber(q.maxCookMinutes, 45, 10, 180),
     excludedProducts: safeIds(q.excludedProducts, 200),
   };
-  return { preferences, quizAnswers, updatedAt: new Date().toISOString() };
+  return { preferences, quizAnswers, updatedAt: typeof value.updatedAt === "string" ? value.updatedAt : new Date().toISOString() };
 }
 async function getManagementAccessToken(config: Auth0Config): Promise<string> {
   if (managementToken && Date.now() < managementTokenExpiresAt - 30_000) return managementToken;
